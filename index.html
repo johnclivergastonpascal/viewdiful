@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Player Moderno</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div id="player-container">
+
+    <!-- APPBAR -->
+    <div id="appbar">
+      <button id="parts-menu-btn" onclick="toggleMenu()">☰ Partes</button>
+      <div id="title-bar">Cargando título...</div>
+      <!-- <button id="explore-btn" onclick="toggleExplore()">🔍 Explorar</button> -->
+      <button id="search-btn" onclick="toggleSearch()" style="padding: 5px;">🔎 Buscar</button>
+          <!-- PANEL BUSCADOR -->
+<div id="search-panel">
+  <div class="close-btn" onclick="toggleSearch()">✖</div>
+  <input type="text" id="search-input" placeholder="Buscar video..." style="padding:10px; font-size:16px; border:2px solid #ff3d3d; border-radius:6px; background:#000; color:#fff; margin-bottom:15px; width:100%;">
+  <div id="search-results"></div>
+</div>
+
+
+    </div>
+
+
+    <!-- DRAWER PARTES -->
+    <div id="parts-menu">
+      <div class="close-btn" onclick="toggleMenu()">✖</div>
+    </div>
+          <!-- PANEL BUSCADOR -->
+<div id="search-panel">
+  <div class="close-btn" onclick="toggleSearch()">✖</div>
+  <input type="text" id="search-input" placeholder="Buscar video..." style="padding:10px; font-size:16px; border:2px solid #ff3d3d; border-radius:6px; background:#000; color:#fff; margin-bottom:15px; width:100%;">
+  <div id="search-results"></div>
+</div>
+    <!-- PANEL EXPLORAR -->
+    <div id="explore-panel">
+      <div class="close-btn" onclick="toggleExplore()">✖</div>
+      <div id="thumbnails-container"></div>
+    </div>
+
+    <!-- VIDEO -->
+    <iframe id="ytplayer" allow="autoplay"></iframe>
+
+    <!-- SOUND -->
+    <div id="sound-btn" onclick="enableSound()">🔊 Toca para activar el sonido</div>
+
+    <!-- BOTTOM UI -->
+<div id="bottom-ui">
+  <div id="progress-container"><div id="progress-bar"></div></div>
+
+  <!-- BOTONES VIDEO ANTERIOR/SIGUIENTE -->
+  <div id="video-nav-buttons">
+    <button id="prev-video-btn" style="display: none;">↑ Video anterior</button>
+    <button id="next-video-btn" style="display: none;">↓ Siguiente video</button>
+  </div>
+
+  <div id="controls">
+    <button onclick="prevPart()">Anterior</button>
+    <button onclick="back5()">-5s</button>
+    <button onclick="togglePlay()" id="play-btn">⏸ Pausar</button>
+    <button onclick="skip5()">+5s</button>
+    <button onclick="nextPart()">Siguiente</button>
+  </div>
+  <div id="ad-container"></div>
+</div>
+  </div>
+
+<script src="script.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,276 @@
+  <script>
+    let videoData = [];
+    let videoIndex = 0;
+    let videoId = "";
+    let partes = [];
+    let current = 0;
+    let allowSound = false;
+    let progressInterval;
+    let currentProgress = 0;
+    let paused = false;
+
+    const JSON_URL = "https://raw.githubusercontent.com/johnclivergastonpascal/server_viewdiful/refs/heads/main/videos.json";
+
+    async function loadJSON() {
+      const res = await fetch(JSON_URL);
+      videoData = await res.json();
+      buildThumbnails();
+      loadVideo(videoIndex);
+    }
+
+    function loadVideo(index) {
+      if (index < 0 || index >= videoData.length) return;
+      const video = videoData[index];
+      videoId = video.id;
+      partes = video.partes;
+      current = 0;
+      document.getElementById("title-bar").innerText = video.titulo || video.Title || "Sin título";
+      buildPartsList();
+      loadPart(current);
+    }
+
+    function buildPartsList() {
+      const menu = document.getElementById("parts-menu");
+      menu.querySelectorAll('.part-item').forEach(e => e.remove());
+      partes.forEach((p, i) => {
+        const div = document.createElement("div");
+        div.className = "part-item";
+        div.innerText = `Parte ${p.parte ?? (i+1)}`;
+        div.onclick = () => { loadPart(i); toggleMenu(); };
+        menu.appendChild(div);
+      });
+      highlightCurrentPart();
+    }
+
+    function toggleMenu() { document.getElementById("parts-menu").classList.toggle("open"); }
+    function highlightCurrentPart() { document.querySelectorAll('.part-item').forEach((el, idx) => el.classList.toggle('active', idx === current)); }
+    function enableSound() { allowSound = true; document.getElementById("sound-btn").style.display = "none"; loadPart(current); }
+
+    function loadPart(i) {
+      if (i < 0 || i >= partes.length) return;
+      current = i; paused = false;
+      document.getElementById("play-btn").innerText = "⏸ Pausar";
+      highlightCurrentPart();
+      currentProgress = 0;
+      showUI();
+
+      const start = partes[i].inicio_seg ?? partes[i].Start ?? 0;
+      const duration = partes[i].duracion_seg ?? partes[i].Duration ?? 0;
+      const end = start + duration - 0.1;
+      const unique = Date.now();
+      document.getElementById("ytplayer").src = `https://www.youtube.com/embed/${videoId}?start=${start}&end=${end}&autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1&mute=${allowSound ? 0 : 1}&v=${unique}`;
+      startProgress(duration);
+    }
+
+    function startProgress(duration) {
+      clearInterval(progressInterval);
+      const bar = document.getElementById("progress-bar");
+      currentProgress = 0; bar.style.width = "0%";
+      progressInterval = setInterval(() => {
+        if (paused) return;
+        currentProgress++;
+        bar.style.width = (currentProgress / duration) * 100 + "%";
+        if (currentProgress >= duration) { clearInterval(progressInterval); nextPart(); }
+      }, 1000);
+    }
+
+    function back5() {
+      const base = partes[current].inicio_seg ?? partes[current].Start ?? 0;
+      let newPos = base + currentProgress - 5;
+      if (newPos < base) newPos = base;
+      loadCustomTime(newPos);
+    }
+
+    function skip5() {
+      const base = partes[current].inicio_seg ?? partes[current].Start ?? 0;
+      const dur = partes[current].duracion_seg ?? partes[current].Duration ?? 0;
+      let newPos = base + currentProgress + 5;
+      if (newPos >= base + dur) return nextPart();
+      loadCustomTime(newPos);
+    }
+
+    function loadCustomTime(pos) {
+      const part = partes[current];
+      const start = part.inicio_seg ?? part.Start ?? 0;
+      const duration = part.duracion_seg ?? part.Duration ?? 0;
+      const end = start + duration - 0.1;
+      const unique = Date.now();
+      document.getElementById("ytplayer").src = `https://www.youtube.com/embed/${videoId}?start=${pos}&end=${end}&autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1&mute=${allowSound ? 0 : 1}&v=${unique}`;
+      restartProgressFrom(pos - start);
+    }
+
+    function restartProgressFrom(sec) {
+      clearInterval(progressInterval);
+      const duration = partes[current].duracion_seg ?? partes[current].Duration ?? 0;
+      const bar = document.getElementById("progress-bar");
+      currentProgress = sec;
+      bar.style.width = (sec / duration) * 100 + "%";
+      progressInterval = setInterval(() => {
+        if (paused) return;
+        currentProgress++;
+        bar.style.width = (currentProgress / duration) * 100 + "%";
+        if (currentProgress >= duration) { clearInterval(progressInterval); nextPart(); }
+      }, 1000);
+    }
+
+function togglePlay() {
+  const playBtn = document.getElementById("play-btn");
+  const part = partes[current];
+  const start = part.inicio_seg ?? part.Start ?? 0;
+  const duration = part.duracion_seg ?? part.Duration ?? 0;
+  const end = start + duration - 0.1;
+
+  paused = !paused;
+  playBtn.innerText = paused ? "▶ Reanudar" : "⏸ Pausar";
+
+  if (paused) {
+    // PAUSA REAL: vaciamos el iframe para detener el video
+    document.getElementById("ytplayer").src = "about:blank";
+  } else {
+    // REANUDAR: cargamos el video desde el tiempo actual
+    const unique = Date.now();
+    document.getElementById("ytplayer").src = 
+      `https://www.youtube.com/embed/${videoId}?start=${start + currentProgress}&end=${end}&autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1&mute=${allowSound ? 0 : 1}&v=${unique}`;
+    
+    // reinicia el contador desde donde quedó
+    restartProgressFrom(currentProgress);
+  }
+}
+
+    function nextPart() { if (current < partes.length - 1) loadPart(current + 1); }
+    function prevPart() { if (current > 0) loadPart(current - 1); }
+
+    const prevBtn = document.getElementById('prev-video-btn');
+    const nextBtn = document.getElementById('next-video-btn');
+    const explorePanel = document.getElementById('explore-panel');
+    const thumbnailsContainer = document.getElementById('thumbnails-container');
+
+function showUI() {
+  const appbar = document.getElementById("appbar");
+  const bottomUI = document.getElementById("bottom-ui");
+  const searchPanel = document.getElementById("search-panel");
+  const explorePanel = document.getElementById("explore-panel");
+  const partsMenu = document.getElementById("parts-menu");
+
+  // Mostrar UI
+  appbar.style.top = "0";
+  bottomUI.style.opacity = 1;
+  nextBtn.classList.add('visible');
+  prevBtn.classList.add('visible');
+
+  // Si UI aparece, aseguramos que ningún panel esté hidden
+  searchPanel.classList.remove("hidden");
+  explorePanel.classList.remove("hidden");
+  partsMenu.classList.remove("hidden");
+
+  clearTimeout(hideTimeout);
+
+  hideTimeout = setTimeout(() => {
+    // OCULTAR UI
+    appbar.style.top = "-70px";
+    bottomUI.style.opacity = 0;
+    nextBtn.classList.remove('visible');
+    prevBtn.classList.remove('visible');
+
+    // Cerrar automáticamente los paneles para evitar pantalla negra
+    searchPanel.classList.remove("open");
+    explorePanel.classList.remove("open");
+    partsMenu.classList.remove("open");
+
+    // Ocultar visualmente con la clase hidden
+    searchPanel.classList.add("hidden");
+    explorePanel.classList.add("hidden");
+    partsMenu.classList.add("hidden");
+
+  }, 5000);
+}
+
+
+    let hideTimeout;
+    prevBtn.addEventListener("click", () => { videoIndex--; if(videoIndex<0) videoIndex=videoData.length-1; loadVideo(videoIndex); showUI(); });
+    nextBtn.addEventListener("click", () => { videoIndex++; if(videoIndex>=videoData.length) videoIndex=0; loadVideo(videoIndex); showUI(); });
+
+    function toggleExplore() { explorePanel.classList.toggle('open'); }
+
+function buildThumbnails() {
+  thumbnailsContainer.innerHTML = "";
+  videoData.forEach((video, index) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'thumbnail-wrapper';
+
+    const img = document.createElement('img');
+img.src = video.thumbnail
+  ? `https://raw.githubusercontent.com/johnclivergastonpascal/server_viewdiful/main/${video.thumbnail}`
+  : "";
+img.alt = video.titulo ?? "Sin título";
+img.style.width = "100%";   // fuerza que ocupe todo el wrapper
+img.style.height = "auto";
+img.onerror = () => { img.src = 'https://via.placeholder.com/180x100?text=Sin+imagen'; };
+img.loading="lazy";
+
+    const overlay = document.createElement('div');
+    overlay.className = 'thumbnail-overlay';
+    overlay.innerText = `${video.titulo ?? "Sin título"} | ${video.partes?.length ?? 0} partes`;
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(overlay);
+
+    wrapper.onclick = () => { loadVideo(index); toggleExplore(); showUI(); };
+
+    thumbnailsContainer.appendChild(wrapper);
+  });
+}
+
+const searchPanel = document.getElementById("search-panel");
+const searchInput = document.getElementById("search-input");
+const searchResults = document.getElementById("search-results");
+
+function toggleSearch() {
+  searchPanel.classList.toggle("open");
+  searchInput.value = "";
+  buildSearchResults(""); // limpia o muestra todos al abrir
+  searchInput.focus();
+}
+
+searchInput.addEventListener("input", () => {
+  const query = searchInput.value.toLowerCase();
+  buildSearchResults(query);
+});
+
+function buildSearchResults(query) {
+  searchResults.innerHTML = "";
+  videoData.forEach((video, index) => {
+    if (video.titulo.toLowerCase().includes(query)) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'thumbnail-wrapper';
+
+      const img = document.createElement('img');
+      img.src = video.thumbnail
+        ? `https://raw.githubusercontent.com/johnclivergastonpascal/server_viewdiful/main/${video.thumbnail}`
+        : "";
+      img.alt = video.titulo ?? "Sin título";
+      img.style.width = "100%";
+      img.onerror = () => { img.src = 'https://via.placeholder.com/180x100?text=Sin+imagen'; };
+      img.loading="lazy"
+
+      const overlay = document.createElement('div');
+      overlay.className = 'thumbnail-overlay';
+      overlay.innerText = `${video.titulo ?? "Sin título"} | ${video.partes?.length ?? 0} partes`;
+
+      wrapper.appendChild(img);
+      wrapper.appendChild(overlay);
+
+      wrapper.onclick = () => { loadVideo(index); toggleSearch(); showUI(); };
+
+      searchResults.appendChild(wrapper);
+    }
+  });
+}
+
+
+    document.addEventListener("mousemove", showUI);
+    document.addEventListener("touchstart", showUI);
+    document.addEventListener("keydown", showUI);
+
+    loadJSON();
+  </script>
