@@ -1,298 +1,366 @@
-    /* Reset básico */
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #000; height: 100vh; overflow: hidden; color: #fff; }
-    #player-container { position: relative; width: 100%; height: 100%; }
-    iframe { width: 100%; height: 100%; border: none; pointer-events: none; }
 
-    /* APPBAR */
-    #appbar { position: absolute; top: 0; left: 0; width: 100%; height: 60px; display: flex; align-items: center; padding: 0 20px; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 100; transition: top 0.3s; }
-    #title-bar { font-size:20px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex: 1; color: #fff; }
-    button, .part-item { border:2px solid #ff3d3d; border-radius:6px; font-weight:bold; cursor:pointer; transition:all 0.3s; color:#ff3d3d; background-color:#000; text-align:center; }
-    button:hover, .part-item:hover { background:#ff3d3d; color:#fff; }
-    #parts-menu-btn { padding:6px 14px; margin-right:10px; }
-    #explore-btn { padding:6px 14px; margin-left:10px; }
-
-    /* DRAWER */
-    #parts-menu { position:absolute; top:0; left:0; width:280px; height:100%; background:#111; padding:20px; transform:translateX(-100%); transition: transform 0.3s ease-in-out; z-index:110; overflow-y:auto; box-shadow:4px 0 12px rgba(0,0,0,0.5); }
-    #parts-menu.open { transform:translateX(0); }
-    .close-btn { text-align:right; font-size:22px; cursor:pointer; margin-bottom:20px; color:#ff3d3d; transition:color 0.3s; }
-    .close-btn:hover { color:#ff0000; }
-    .part-item { padding:10px 12px; margin-bottom:8px; font-size:16px; }
-    .part-item.active { background:#ff3d3d; color:#fff; font-weight:bold; }
-
-    /* BOTTOM CONTROLS */
-    #bottom-ui { position:absolute; bottom:0; width:100%; padding:15px 25px; background:linear-gradient(to top, rgba(0,0,0,0.85), transparent); z-index:90; display:flex; flex-direction:column; gap:12px; transition: opacity 0.3s; }
-    #progress-container { width:100%; height:6px; background:#333; border-radius:6px; overflow:hidden; }
-    #progress-bar { width:0%; height:100%; background:#ff3d3d; transition:width 0.2s; }
-    #controls { display:flex; justify-content:space-between; gap:10px; }
-    #controls button { flex:1; padding:10px 0; font-size:16px; }
-    #sound-btn { position:absolute; inset:0; display:flex; justify-content:center; align-items:center; background: rgba(0,0,0,0.75); font-size:26px; z-index:95; cursor:pointer; transition:background 0.3s; }
-    #sound-btn:hover { background: rgba(0,0,0,0.9); }
-
-    /* anuncios */
-    #ad-container { display:flex; gap:10px; overflow-x:auto; -ms-overflow-style:none; scrollbar-width:none; margin-top:10px; }
-    #ad-container::-webkit-scrollbar { display:none; }
-
-    /* BOTONES VIDEO ANTERIOR/SIGUIENTE */
-    #prev-video-btn, #next-video-btn {
-      position: fixed;
-      bottom: 80px;
-      padding: 12px 18px;
-      font-size: 18px;
-      background: rgba(255,61,61,0.8);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: opacity 0.3s, transform 0.2s;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 120;
+    :root{
+        --bg-1:#000;
+        --glass-bg: rgba(28,28,30,0.42);
+        --glass-border: rgba(255,255,255,0.07);
+        --text-light:#fff;
+        --text-dim:#cfcfd1;
+        --accent:#4da3ff;
+        --ui-radius:14px;
+        --safe-top: env(safe-area-inset-top, 12px);
+        --safe-bottom: env(safe-area-inset-bottom, 12px);
     }
-    #prev-video-btn { left: 20px; }
-    #next-video-btn { right: 20px; }
-    #prev-video-btn.visible, #next-video-btn.visible { opacity:1; pointer-events:auto; transform: translateY(0); }
-    #prev-video-btn:hover, #next-video-btn:hover { background: rgba(255,61,61,1); }
 
-    /* PANEL EXPLORAR */
-    #explore-panel {
-      position: fixed;
-      top: 0;
-      right: 0;
-      width: 320px;
-      height: 100%;
-      background: #111;
-      padding: 20px;
-      transform: translateX(100%);
-      transition: transform 0.3s ease-in-out;
-      z-index:115;
-      overflow-y: auto;
-      box-shadow: -4px 0 12px rgba(0,0,0,0.5);
+    /* Reset */
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+        font-family: -apple-system, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+        background: linear-gradient(180deg, #000 0%, #050505 100%);
+        color:var(--text-light);
+        -webkit-font-smoothing:antialiased;
+        -moz-osx-font-smoothing:grayscale;
+        overflow:hidden;
     }
-    #explore-panel.open { transform: translateX(0); }
-    #explore-panel .close-btn { text-align: right; font-size: 22px; cursor:pointer; margin-bottom: 20px; color: #ff3d3d; }
-    #explore-panel .close-btn:hover { color:#ff0000; }
-    .thumbnail { width:100%; margin-bottom:12px; cursor:pointer; border:2px solid #ff3d3d; border-radius:6px; transition: all 0.3s; }
-    .thumbnail:hover { transform: scale(1.03); border-color:#fff; }
-    /* Thumbnail con overlay */
-.thumbnail-wrapper {
-  position: relative;
-  width: 100%;
-  margin-bottom: 12px;
-  cursor: pointer;
-  border: 2px solid #ff3d3d;
-  border-radius: 6px;
-  overflow: hidden;
-  transition: transform 0.3s, border-color 0.3s;
-}
-.thumbnail-wrapper:hover {
-  transform: scale(1.03);
-  border-color: #fff;
-}
-.thumbnail-wrapper img {
-  width: 100%;
-  display: block;
-}
-.thumbnail-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
-  color: #fff;
-  padding: 8px 10px;
-  font-size: 14px;
-  font-weight: bold;
-}
-/* PANEL EXPLORAR */
-#explore-panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;        /* ocupa toda la pantalla */
-  height: 100vh;
-  background: #111;
-  padding: 20px;
-  transform: translateY(100%);  /* deslice desde abajo */
-  transition: transform 0.3s ease-in-out;
-  z-index: 200;
-  overflow-y: auto;   /* permite scroll si hay muchas miniaturas */
-  display: flex;
-  flex-direction: column;
-}
 
-/* Scroll personalizado para panel explorar */
-#explore-panel::-webkit-scrollbar {
-  width: 10px;
-}
+    /* Smooth behaviour */
+    html { scroll-behavior: smooth; }
 
-#explore-panel::-webkit-scrollbar-track {
-  background: #222;
-  border-radius: 5px;
-}
+    /* CONTAINER PRINCIPAL (scroll tipo TikTok) */
+    #tiktok-scroll-container {
+        height: 100vh;
+        overflow-y: auto;
+        /* SCROLL-SNAP MODIFICADO: No es obligatorio, se manejará por JS */
+        /* scroll-snap-type: y mandatory; */ 
+        -webkit-overflow-scrolling: touch;
+    }
+    #tiktok-scroll-container::-webkit-scrollbar { width: 0; height: 0; }
 
-#explore-panel::-webkit-scrollbar-thumb {
-  background: #ff3d3d;
-  border-radius: 5px;
-  border: 2px solid #111; /* separa un poco del track */
-}
+    /* Cada "página" es un vídeo */
+    .video-page {
+        height: 100vh;
+        scroll-snap-align: start;
+        position:relative;
+        display:flex;
+        align-items:stretch;
+        justify-content:stretch;
+        background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35));
+    }
+    
+    /* PARTES DE UN VIDEO: Usaremos estas secciones internas para el scroll de partes */
+    .video-page .part-section {
+        height: 100vh;
+        width: 100%;
+        scroll-snap-align: start;
+        position: relative;
+    }
 
-#explore-panel::-webkit-scrollbar-thumb:hover {
-  background: #ff5a5a;
-}
+    /* IFRAME (fijo en pantalla, se controla por JS) */
+    #player-frame {
+        position:fixed;
+        inset:0;
+        width:100%;
+        height:100%;
+        border:0;
+        background:#000;
+        z-index:1;
+        pointer-events:none; /* control por JS/overlay */
+        
+        /* MEJORA 1: Iframe inicialmente oculto, transición para aparecer */
+        opacity: 0; 
+        transition: opacity 0.3s ease-in-out;
+    }
+    #player-frame.active {
+        opacity: 1; 
+    }
 
-/* Firefox */
-#explore-panel {
-  scrollbar-width: thin;
-  scrollbar-color: #ff3d3d #222;
-}
+    /* Cada página tiene miniatura visible debajo del iframe para "efecto" */
+    .page-inner {
+        position:relative;
+        width:100%;
+        height:100%;
+        display:block;
+        z-index:0;
+        overflow:hidden;
+    }
+    .page-thumb {
+        position:absolute;
+        inset:0;
+        background-size:cover;
+        background-position:center center;
+        filter: blur(0.6px) saturate(0.95);
+        transform: scale(1.02);
+        transition: filter 0.3s ease; /* Transición para el desenfoque */
+    }
+    
+    /* MEJORA 2: La miniatura se desenfoca cuando el video está activo */
+    .video-page.active .page-thumb {
+        filter: blur(5px) saturate(0.5); 
+    }
 
-
-/* Contenedor de miniaturas */
-#thumbnails-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 15px;
-  flex: 1;
-}
-
-.thumbnail-wrapper {
-  position: relative;
-  width: 100%;
-  cursor: pointer;
-  border: 2px solid #ff3d3d;
-  border-radius: 6px;
-  overflow: hidden;
-  transition: transform 0.3s, border-color 0.3s;
-}
+    /* MEJORA 3: Indicador de carga sobre el thumbnail */
+    .video-page.loading .page-thumb::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 40px;
+        height: 40px;
+        border: 4px solid var(--text-light);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        z-index: 10;
+    }
+    @keyframes spin {
+        to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
 
 
+    /* overlay info por página */
+    .page-overlay {
+        position:absolute;
+        left:12px;
+        right:12px;
+        bottom:110px;
+        z-index:3;
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        align-items:flex-end;
+    }
+    .page-title {
+        max-width:70%;
+        font-size:18px;
+        font-weight:700;
+        text-shadow: 0 8px 30px rgba(0,0,0,0.7);
+    }
+    .page-meta {
+        font-size:13px;
+        color:var(--text-dim);
+        text-shadow: 0 6px 18px rgba(0,0,0,0.6);
+    }
 
-    #video-nav-buttons {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px; /* separa un poco de la barra */
-}
+    /* APPBAR (top) */
+    #appbar{
+        position:fixed;
+        left:0;
+        right:0;
+        top:calc(var(--safe-top) + 8px);
+        height:56px;
+        margin:0 12px;
+        display:flex;
+        align-items:center;
+        gap:12px;
+        padding:8px;
+        border-radius:12px;
+        backdrop-filter: blur(14px) saturate(1.1);
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        border:1px solid var(--glass-border);
+        z-index:40;
+        transition: top .36s cubic-bezier(.2,.9,.2,1), opacity .3s;
+    }
+    #title-bar{
+        font-weight:600;
+        font-size:16px;
+        flex:1;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        color:var(--text-light);
+    }
+    .app-btn{
+        min-width:44px;
+        height:44px;
+        display:inline-grid;
+        place-items:center;
+        padding:6px;
+        border-radius:10px;
+        background: rgba(255,255,255,0.02);
+        border:1px solid rgba(255,255,255,0.04);
+        color:var(--text-light);
+        cursor:pointer;
+        transition: transform .12s ease, background .12s;
+        font-size:18px;
+        z-index: 45;
+    }
+    .app-btn:active{transform:scale(.96)}
+    .app-btn--accent{
+        background: linear-gradient(180deg, rgba(77,163,255,0.12), rgba(77,163,255,0.06));
+        border:1px solid rgba(77,163,255,0.18);
+        color:var(--accent);
+    }
 
-#prev-video-btn, #next-video-btn {
-  position: static; /* ya no está fijo */
-  opacity: 1;
-  pointer-events: auto;
-  flex: 1;
-  margin: 0 10px;
-  font-size: 16px;
-  background: rgba(255,61,61,0.8);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.3s;
-}
+    /* PARTS DRAWER (right) */
+    #parts-menu{
+        position:fixed;
+        top:0; right:0;
+        height:100%;
+        width:300px;
+        padding-top:96px;
+        padding-left:12px;
+        padding-right:12px;
+        transform:translateX(100%);
+        transition: transform .34s cubic-bezier(.2,.9,.2,1);
+        background: linear-gradient(180deg, rgba(18,18,20,0.96), rgba(12,12,14,0.98));
+        border-left:1px solid rgba(255,255,255,0.03);
+        z-index:60;
+        overflow:auto;
+    }
+    #parts-menu.open{transform:translateX(0)}
+    .part-item{
+        padding:12px 14px;
+        margin-bottom:8px;
+        border-radius:10px;
+        color:var(--text-light);
+        font-size:15px;
+        background:transparent;
+        border:1px solid rgba(255,255,255,0.02);
+        cursor:pointer;
+    }
+    .part-item.active{background:rgba(255,255,255,0.06); font-weight:600}
 
-#prev-video-btn:hover, #next-video-btn:hover {
-  background: rgba(255,61,61,1);
-}
+    /* SOUND PROMPT (central) */
+    #sound-btn{
+        position:fixed;
+        inset:0;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:50;
+        font-size:20px;
+        background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.75));
+        color:var(--text-light);
+        cursor:pointer;
+        padding:20px;
+    }
 
-/* PANEL BUSCAR */
-#search-panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: #111;
-  padding: 20px;
-  transform: translateY(100%);
-  transition: transform 0.3s ease-in-out;
-  z-index: 210;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
+    /* Prev/Next circular */
+    #prev-video-btn,#next-video-btn{
+        position:fixed;
+        top:50%;
+        transform:translateY(-50%);
+        width:52px;height:52px;border-radius:999px;
+        display:grid;place-items:center;
+        background:var(--glass-bg);border:1px solid var(--glass-border);
+        color:var(--text-light);font-size:20px;cursor:pointer;z-index:45;opacity:0;pointer-events:none;transition:opacity .24s;
+    }
+    #prev-video-btn.visible,#next-video-btn.visible{opacity:1;pointer-events:auto}
+    #prev-video-btn{left:10px}#next-video-btn{right:10px}
 
-/* Scroll personalizado */
-#search-panel::-webkit-scrollbar {
-  width: 10px;
-}
-#search-panel::-webkit-scrollbar-track { background: #222; border-radius:5px; }
-#search-panel::-webkit-scrollbar-thumb { background: #ff3d3d; border-radius:5px; border:2px solid #111; }
-#search-panel::-webkit-scrollbar-thumb:hover { background:#ff5a5a; }
-#search-panel { scrollbar-width: thin; scrollbar-color: #ff3d3d #222; }
+    /* EXPLORE & SEARCH PANELS (full screen slides up) */
+    #explore-panel,#search-panel{
+        position:fixed;left:0;right:0;bottom:0;top:0;
+        padding:84px 12px 20px;
+        background: linear-gradient(180deg, rgba(6,6,8,0.88), rgba(10,10,12,0.96));
+        transform:translateY(110%);
+        transition:transform .36s cubic-bezier(.2,.9,.2,1);
+        z-index:55;overflow:auto;
+    }
+    #explore-panel.open,#search-panel.open{transform:translateY(0)}
 
-/* Contenedor resultados */
-#search-results {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 15px;
-  flex: 1;
-}
+    /* Thumbnails grid — ALWAYS 2 columns on small screens (320px) */
+    #thumbnails-container,#search-results{
+        display:grid;
+        grid-template-columns:repeat(2,1fr);
+        gap:12px;
+    }
 
-/* Oculta paneles cuando la UI se oculta */
-#appbar.hidden,
-#bottom-ui.hidden,
-#explore-panel.hidden,
-#search-panel.hidden {
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
+    .thumbnail-wrapper{
+        border-radius:12px;overflow:hidden;
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        border:1px solid rgba(255,255,255,0.03);
+        box-shadow: 0 6px 30px rgba(0,0,0,0.45);
+        transition: transform .12s ease, box-shadow .12s;
+        position:relative;
+    }
+    .thumbnail-wrapper:active{transform:scale(.98)}
+    .thumbnail-wrapper img{width:100%;height:auto;display:block}
+    .thumbnail-overlay{
+        position:absolute;left:0;right:0;bottom:0;padding:8px 10px;
+        background: linear-gradient(transparent, rgba(0,0,0,0.84));
+        color:var(--text-light);font-size:13px;font-weight:700;
+    }
 
-#appbar.hidden,
-#bottom-ui.hidden,
-#explore-panel.hidden,
-#search-panel.hidden {
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
+    /* BOTTOM UI (controls) */
+    #bottom-ui{
+        position:fixed;
+        left:12px;
+        right:12px;
+        bottom:calc(var(--safe-bottom) + 12px);
+        padding:12px;
+        border-radius:14px;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        align-items:stretch;
+        backdrop-filter: blur(18px);
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        border:1px solid var(--glass-border);
+        z-index:45;
+        transition: opacity .36s ease;
+    }
+    .progress-container{width:100%;height:8px;background: rgba(255,255,255,0.04);border-radius:999px;overflow:hidden}
+    #progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent), #7ed1ff);transition:width .25s linear}
 
-#search-panel {
-  transform: translateY(100%);
-}
+    .controls-row{display:flex;gap:8px;align-items:center}
+    .control-btn{flex:1;display:inline-flex;gap:8px;align-items:center;justify-content:center;padding:10px;border-radius:12px;background: rgba(255,255,255,0.02);color:var(--text-light);border:1px solid rgba(255,255,255,0.03);cursor:pointer;font-weight:600;font-size:14px}
+    .control-btn:active{transform:scale(.97)}
 
-#search-panel.open {
-  transform: translateY(0);
-}
-/* CONTENEDOR DE ANUNCIOS */
-#ad-container {
-  display: flex;
-  flex-direction: row;
-  gap: 12px;
-  overflow-x: auto;
-  white-space: nowrap;
-  padding: 10px 5px;
-  scrollbar-width: none;
-}
-#ad-container::-webkit-scrollbar {
-  display: none;
-}
+    /* Ads small */
+    #ad-container{display:flex;flex-direction:row;gap:10px;overflow:auto;padding:6px 0}
+    .ad-box{min-width:180px;height:56px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;padding:6px;color:var(--text-dim)}
 
-/* TARJETAS DE ANUNCIO */
-.ad-box {
-  min-width: 468px;
-  height: 60px;
-  background: #111;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border-radius: 6px;
-  padding: 5px;
-}
+    /* Small screens adjustments */
+    @media (max-width:420px){
+        #parts-menu{width:260px}
+        #appbar{margin:0 10px;padding:6px;height:52px;border-radius:12px}
+        #title-bar{font-size:15px}
+        .control-btn{font-size:13px;padding:9px;border-radius:10px}
+        #bottom-ui{left:10px;right:10px;padding:10px;border-radius:12px}
+        #thumbnails-container,#search-results{gap:10px}
+    }
 
-/* --- Media Query para Móviles --- */
-@media (max-width: 480px) {
-  /* Ajusta el ancho mínimo de los anuncios para que quepan en el móvil */
-  .ad-box {
-    min-width: 90vw; /* Ocupa el 90% del ancho de la vista */
-    width: 90vw;
-  }
+    /* Ajustes para pantallas medianas (ej. tabletas en landscape) */
+    @media (min-width: 600px) {
+        #thumbnails-container, #search-results {
+        /* 3 columnas en pantallas medianas */
+        grid-template-columns: repeat(3, 1fr);
+        }
+    }
 
-  /* Reduce el padding de los controles inferiores */
-  #bottom-ui {
-    padding: 10px 15px;
-    gap: 8px;
-  }
-  
-  /* Reduce el tamaño del texto del título en la appbar */
-  #title-bar {
-    font-size: 16px;
-  }
-}
+    /* Ajustes para pantallas grandes (ej. desktop) */
+    @media (min-width: 1024px) {
+        #explore-panel, #search-panel {
+        /* Hacer el panel flotar a la izquierda/derecha para no cubrir toda la vista */
+        max-width: 600px;
+        left: 50%;
+        transform: translate(-50%, 110%);
+        top: 0;
+        bottom: 0;
+        padding-top: 96px;
+        border-radius: 16px;
+        margin: 12px auto; /* Centrar el panel */
+        height: calc(100vh - 24px); /* Ajuste de altura */
+        }
+        #explore-panel.open, #search-panel.open {
+        /* Posición final de apertura en desktop */
+        transform: translate(-50%, 0%);
+        }
+        #thumbnails-container, #search-results {
+        /* 4 columnas en desktop */
+        grid-template-columns: repeat(4, 1fr);
+        }
+    }
+    
+    /* Nueva regla CSS para el contenedor interno de cada video-page */
+    .video-page-parts-container {
+        width: 100%;
+        height: 100vh;
+        overflow-y: auto; /* Permite el scroll vertical dentro de esta sección */
+        scroll-snap-type: y mandatory; /* Habilita el snap para las partes */
+    }
+    .video-page-parts-container::-webkit-scrollbar { width: 0; height: 0; }
+
+    

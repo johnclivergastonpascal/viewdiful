@@ -1,276 +1,949 @@
-  <script>
-    let videoData = [];
-    let videoIndex = 0;
-    let videoId = "";
-    let partes = [];
-    let current = 0;
-    let allowSound = false;
-    let progressInterval;
-    let currentProgress = 0;
-    let paused = false;
-
-    const JSON_URL = "https://raw.githubusercontent.com/johnclivergastonpascal/server_viewdiful/refs/heads/main/videos.json";
-
-    async function loadJSON() {
-      const res = await fetch(JSON_URL);
-      videoData = await res.json();
-      buildThumbnails();
-      loadVideo(videoIndex);
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+    <title>Player Moderno — Control por Partes</title>
+    <style>
+    :root{
+        --bg-1:#000;
+        --glass-bg: rgba(28,28,30,0.42);
+        --glass-border: rgba(255,255,255,0.07);
+        --text-light:#fff;
+        --text-dim:#cfcfd1;
+        --accent:#4da3ff;
+        --ui-radius:14px;
+        --safe-top: env(safe-area-inset-top, 12px);
+        --safe-bottom: env(safe-area-inset-bottom, 12px);
     }
 
-    function loadVideo(index) {
-      if (index < 0 || index >= videoData.length) return;
-      const video = videoData[index];
-      videoId = video.id;
-      partes = video.partes;
-      current = 0;
-      document.getElementById("title-bar").innerText = video.titulo || video.Title || "Sin título";
-      buildPartsList();
-      loadPart(current);
+    /* Reset */
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+        font-family: -apple-system, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+        background: linear-gradient(180deg, #000 0%, #050505 100%);
+        color:var(--text-light);
+        -webkit-font-smoothing:antialiased;
+        -moz-osx-font-smoothing:grayscale;
+        overflow:hidden;
     }
 
-    function buildPartsList() {
-      const menu = document.getElementById("parts-menu");
-      menu.querySelectorAll('.part-item').forEach(e => e.remove());
-      partes.forEach((p, i) => {
-        const div = document.createElement("div");
-        div.className = "part-item";
-        div.innerText = `Parte ${p.parte ?? (i+1)}`;
-        div.onclick = () => { loadPart(i); toggleMenu(); };
-        menu.appendChild(div);
-      });
-      highlightCurrentPart();
+    /* Smooth behaviour */
+    html { scroll-behavior: smooth; }
+
+    /* CONTAINER PRINCIPAL (scroll tipo TikTok) */
+    #tiktok-scroll-container {
+        height: 100vh;
+        overflow-y: auto;
+        /* SCROLL-SNAP MODIFICADO: No es obligatorio, se manejará por JS */
+        /* scroll-snap-type: y mandatory; */ 
+        -webkit-overflow-scrolling: touch;
     }
+    #tiktok-scroll-container::-webkit-scrollbar { width: 0; height: 0; }
 
-    function toggleMenu() { document.getElementById("parts-menu").classList.toggle("open"); }
-    function highlightCurrentPart() { document.querySelectorAll('.part-item').forEach((el, idx) => el.classList.toggle('active', idx === current)); }
-    function enableSound() { allowSound = true; document.getElementById("sound-btn").style.display = "none"; loadPart(current); }
-
-    function loadPart(i) {
-      if (i < 0 || i >= partes.length) return;
-      current = i; paused = false;
-      document.getElementById("play-btn").innerText = "⏸ Pausar";
-      highlightCurrentPart();
-      currentProgress = 0;
-      showUI();
-
-      const start = partes[i].inicio_seg ?? partes[i].Start ?? 0;
-      const duration = partes[i].duracion_seg ?? partes[i].Duration ?? 0;
-      const end = start + duration - 0.1;
-      const unique = Date.now();
-      document.getElementById("ytplayer").src = `https://www.youtube.com/embed/${videoId}?start=${start}&end=${end}&autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1&mute=${allowSound ? 0 : 1}&v=${unique}`;
-      startProgress(duration);
+    /* Cada "página" es un vídeo */
+    .video-page {
+        height: 100vh;
+        scroll-snap-align: start;
+        position:relative;
+        display:flex;
+        align-items:stretch;
+        justify-content:stretch;
+        background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35));
     }
-
-    function startProgress(duration) {
-      clearInterval(progressInterval);
-      const bar = document.getElementById("progress-bar");
-      currentProgress = 0; bar.style.width = "0%";
-      progressInterval = setInterval(() => {
-        if (paused) return;
-        currentProgress++;
-        bar.style.width = (currentProgress / duration) * 100 + "%";
-        if (currentProgress >= duration) { clearInterval(progressInterval); nextPart(); }
-      }, 1000);
-    }
-
-    function back5() {
-      const base = partes[current].inicio_seg ?? partes[current].Start ?? 0;
-      let newPos = base + currentProgress - 5;
-      if (newPos < base) newPos = base;
-      loadCustomTime(newPos);
-    }
-
-    function skip5() {
-      const base = partes[current].inicio_seg ?? partes[current].Start ?? 0;
-      const dur = partes[current].duracion_seg ?? partes[current].Duration ?? 0;
-      let newPos = base + currentProgress + 5;
-      if (newPos >= base + dur) return nextPart();
-      loadCustomTime(newPos);
-    }
-
-    function loadCustomTime(pos) {
-      const part = partes[current];
-      const start = part.inicio_seg ?? part.Start ?? 0;
-      const duration = part.duracion_seg ?? part.Duration ?? 0;
-      const end = start + duration - 0.1;
-      const unique = Date.now();
-      document.getElementById("ytplayer").src = `https://www.youtube.com/embed/${videoId}?start=${pos}&end=${end}&autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1&mute=${allowSound ? 0 : 1}&v=${unique}`;
-      restartProgressFrom(pos - start);
-    }
-
-    function restartProgressFrom(sec) {
-      clearInterval(progressInterval);
-      const duration = partes[current].duracion_seg ?? partes[current].Duration ?? 0;
-      const bar = document.getElementById("progress-bar");
-      currentProgress = sec;
-      bar.style.width = (sec / duration) * 100 + "%";
-      progressInterval = setInterval(() => {
-        if (paused) return;
-        currentProgress++;
-        bar.style.width = (currentProgress / duration) * 100 + "%";
-        if (currentProgress >= duration) { clearInterval(progressInterval); nextPart(); }
-      }, 1000);
-    }
-
-function togglePlay() {
-  const playBtn = document.getElementById("play-btn");
-  const part = partes[current];
-  const start = part.inicio_seg ?? part.Start ?? 0;
-  const duration = part.duracion_seg ?? part.Duration ?? 0;
-  const end = start + duration - 0.1;
-
-  paused = !paused;
-  playBtn.innerText = paused ? "▶ Reanudar" : "⏸ Pausar";
-
-  if (paused) {
-    // PAUSA REAL: vaciamos el iframe para detener el video
-    document.getElementById("ytplayer").src = "about:blank";
-  } else {
-    // REANUDAR: cargamos el video desde el tiempo actual
-    const unique = Date.now();
-    document.getElementById("ytplayer").src = 
-      `https://www.youtube.com/embed/${videoId}?start=${start + currentProgress}&end=${end}&autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1&mute=${allowSound ? 0 : 1}&v=${unique}`;
     
-    // reinicia el contador desde donde quedó
-    restartProgressFrom(currentProgress);
-  }
-}
-
-    function nextPart() { if (current < partes.length - 1) loadPart(current + 1); }
-    function prevPart() { if (current > 0) loadPart(current - 1); }
-
-    const prevBtn = document.getElementById('prev-video-btn');
-    const nextBtn = document.getElementById('next-video-btn');
-    const explorePanel = document.getElementById('explore-panel');
-    const thumbnailsContainer = document.getElementById('thumbnails-container');
-
-function showUI() {
-  const appbar = document.getElementById("appbar");
-  const bottomUI = document.getElementById("bottom-ui");
-  const searchPanel = document.getElementById("search-panel");
-  const explorePanel = document.getElementById("explore-panel");
-  const partsMenu = document.getElementById("parts-menu");
-
-  // Mostrar UI
-  appbar.style.top = "0";
-  bottomUI.style.opacity = 1;
-  nextBtn.classList.add('visible');
-  prevBtn.classList.add('visible');
-
-  // Si UI aparece, aseguramos que ningún panel esté hidden
-  searchPanel.classList.remove("hidden");
-  explorePanel.classList.remove("hidden");
-  partsMenu.classList.remove("hidden");
-
-  clearTimeout(hideTimeout);
-
-  hideTimeout = setTimeout(() => {
-    // OCULTAR UI
-    appbar.style.top = "-70px";
-    bottomUI.style.opacity = 0;
-    nextBtn.classList.remove('visible');
-    prevBtn.classList.remove('visible');
-
-    // Cerrar automáticamente los paneles para evitar pantalla negra
-    searchPanel.classList.remove("open");
-    explorePanel.classList.remove("open");
-    partsMenu.classList.remove("open");
-
-    // Ocultar visualmente con la clase hidden
-    searchPanel.classList.add("hidden");
-    explorePanel.classList.add("hidden");
-    partsMenu.classList.add("hidden");
-
-  }, 5000);
-}
-
-
-    let hideTimeout;
-    prevBtn.addEventListener("click", () => { videoIndex--; if(videoIndex<0) videoIndex=videoData.length-1; loadVideo(videoIndex); showUI(); });
-    nextBtn.addEventListener("click", () => { videoIndex++; if(videoIndex>=videoData.length) videoIndex=0; loadVideo(videoIndex); showUI(); });
-
-    function toggleExplore() { explorePanel.classList.toggle('open'); }
-
-function buildThumbnails() {
-  thumbnailsContainer.innerHTML = "";
-  videoData.forEach((video, index) => {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'thumbnail-wrapper';
-
-    const img = document.createElement('img');
-img.src = video.thumbnail
-  ? `https://raw.githubusercontent.com/johnclivergastonpascal/server_viewdiful/main/${video.thumbnail}`
-  : "";
-img.alt = video.titulo ?? "Sin título";
-img.style.width = "100%";   // fuerza que ocupe todo el wrapper
-img.style.height = "auto";
-img.onerror = () => { img.src = 'https://via.placeholder.com/180x100?text=Sin+imagen'; };
-img.loading="lazy";
-
-    const overlay = document.createElement('div');
-    overlay.className = 'thumbnail-overlay';
-    overlay.innerText = `${video.titulo ?? "Sin título"} | ${video.partes?.length ?? 0} partes`;
-
-    wrapper.appendChild(img);
-    wrapper.appendChild(overlay);
-
-    wrapper.onclick = () => { loadVideo(index); toggleExplore(); showUI(); };
-
-    thumbnailsContainer.appendChild(wrapper);
-  });
-}
-
-const searchPanel = document.getElementById("search-panel");
-const searchInput = document.getElementById("search-input");
-const searchResults = document.getElementById("search-results");
-
-function toggleSearch() {
-  searchPanel.classList.toggle("open");
-  searchInput.value = "";
-  buildSearchResults(""); // limpia o muestra todos al abrir
-  searchInput.focus();
-}
-
-searchInput.addEventListener("input", () => {
-  const query = searchInput.value.toLowerCase();
-  buildSearchResults(query);
-});
-
-function buildSearchResults(query) {
-  searchResults.innerHTML = "";
-  videoData.forEach((video, index) => {
-    if (video.titulo.toLowerCase().includes(query)) {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'thumbnail-wrapper';
-
-      const img = document.createElement('img');
-      img.src = video.thumbnail
-        ? `https://raw.githubusercontent.com/johnclivergastonpascal/server_viewdiful/main/${video.thumbnail}`
-        : "";
-      img.alt = video.titulo ?? "Sin título";
-      img.style.width = "100%";
-      img.onerror = () => { img.src = 'https://via.placeholder.com/180x100?text=Sin+imagen'; };
-      img.loading="lazy"
-
-      const overlay = document.createElement('div');
-      overlay.className = 'thumbnail-overlay';
-      overlay.innerText = `${video.titulo ?? "Sin título"} | ${video.partes?.length ?? 0} partes`;
-
-      wrapper.appendChild(img);
-      wrapper.appendChild(overlay);
-
-      wrapper.onclick = () => { loadVideo(index); toggleSearch(); showUI(); };
-
-      searchResults.appendChild(wrapper);
+    /* PARTES DE UN VIDEO: Usaremos estas secciones internas para el scroll de partes */
+    .video-page .part-section {
+        height: 100vh;
+        width: 100%;
+        scroll-snap-align: start;
+        position: relative;
     }
-  });
+
+    /* IFRAME (fijo en pantalla, se controla por JS) */
+    #player-frame {
+        position:fixed;
+        inset:0;
+        width:100%;
+        height:100%;
+        border:0;
+        background:#000;
+        z-index:1;
+        pointer-events:none; /* control por JS/overlay */
+        
+        /* MEJORA 1: Iframe inicialmente oculto, transición para aparecer */
+        opacity: 0; 
+        transition: opacity 0.3s ease-in-out;
+    }
+    #player-frame.active {
+        opacity: 1; 
+    }
+
+    /* Cada página tiene miniatura visible debajo del iframe para "efecto" */
+    .page-inner {
+        position:relative;
+        width:100%;
+        height:100%;
+        display:block;
+        z-index:0;
+        overflow:hidden;
+    }
+    .page-thumb {
+        position:absolute;
+        inset:0;
+        background-size:cover;
+        background-position:center center;
+        filter: blur(0.6px) saturate(0.95);
+        transform: scale(1.02);
+        transition: filter 0.3s ease; /* Transición para el desenfoque */
+    }
+    
+    /* MEJORA 2: La miniatura se desenfoca cuando el video está activo */
+    .video-page.active .page-thumb {
+        filter: blur(5px) saturate(0.5); 
+    }
+
+    /* MEJORA 3: Indicador de carga sobre el thumbnail */
+    .video-page.loading .page-thumb::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 40px;
+        height: 40px;
+        border: 4px solid var(--text-light);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        z-index: 10;
+    }
+    @keyframes spin {
+        to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+
+    /* overlay info por página */
+    .page-overlay {
+        position:absolute;
+        left:12px;
+        right:12px;
+        bottom:110px;
+        z-index:3;
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        align-items:flex-end;
+    }
+    .page-title {
+        max-width:70%;
+        font-size:18px;
+        font-weight:700;
+        text-shadow: 0 8px 30px rgba(0,0,0,0.7);
+    }
+    .page-meta {
+        font-size:13px;
+        color:var(--text-dim);
+        text-shadow: 0 6px 18px rgba(0,0,0,0.6);
+    }
+
+    /* APPBAR (top) */
+    #appbar{
+        position:fixed;
+        left:0;
+        right:0;
+        top:calc(var(--safe-top) + 8px);
+        height:56px;
+        margin:0 12px;
+        display:flex;
+        align-items:center;
+        gap:12px;
+        padding:8px;
+        border-radius:12px;
+        backdrop-filter: blur(14px) saturate(1.1);
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        border:1px solid var(--glass-border);
+        z-index:40;
+        transition: top .36s cubic-bezier(.2,.9,.2,1), opacity .3s;
+    }
+    #title-bar{
+        font-weight:600;
+        font-size:16px;
+        flex:1;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        color:var(--text-light);
+    }
+    .app-btn{
+        min-width:44px;
+        height:44px;
+        display:inline-grid;
+        place-items:center;
+        padding:6px;
+        border-radius:10px;
+        background: rgba(255,255,255,0.02);
+        border:1px solid rgba(255,255,255,0.04);
+        color:var(--text-light);
+        cursor:pointer;
+        transition: transform .12s ease, background .12s;
+        font-size:18px;
+        z-index: 45;
+    }
+    .app-btn:active{transform:scale(.96)}
+    .app-btn--accent{
+        background: linear-gradient(180deg, rgba(77,163,255,0.12), rgba(77,163,255,0.06));
+        border:1px solid rgba(77,163,255,0.18);
+        color:var(--accent);
+    }
+
+    /* PARTS DRAWER (right) */
+    #parts-menu{
+        position:fixed;
+        top:0; right:0;
+        height:100%;
+        width:300px;
+        padding-top:96px;
+        padding-left:12px;
+        padding-right:12px;
+        transform:translateX(100%);
+        transition: transform .34s cubic-bezier(.2,.9,.2,1);
+        background: linear-gradient(180deg, rgba(18,18,20,0.96), rgba(12,12,14,0.98));
+        border-left:1px solid rgba(255,255,255,0.03);
+        z-index:60;
+        overflow:auto;
+    }
+    #parts-menu.open{transform:translateX(0)}
+    .part-item{
+        padding:12px 14px;
+        margin-bottom:8px;
+        border-radius:10px;
+        color:var(--text-light);
+        font-size:15px;
+        background:transparent;
+        border:1px solid rgba(255,255,255,0.02);
+        cursor:pointer;
+    }
+    .part-item.active{background:rgba(255,255,255,0.06); font-weight:600}
+
+    /* SOUND PROMPT (central) */
+    #sound-btn{
+        position:fixed;
+        inset:0;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:50;
+        font-size:20px;
+        background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.75));
+        color:var(--text-light);
+        cursor:pointer;
+        padding:20px;
+    }
+
+    /* Prev/Next circular */
+    #prev-video-btn,#next-video-btn{
+        position:fixed;
+        top:50%;
+        transform:translateY(-50%);
+        width:52px;height:52px;border-radius:999px;
+        display:grid;place-items:center;
+        background:var(--glass-bg);border:1px solid var(--glass-border);
+        color:var(--text-light);font-size:20px;cursor:pointer;z-index:45;opacity:0;pointer-events:none;transition:opacity .24s;
+    }
+    #prev-video-btn.visible,#next-video-btn.visible{opacity:1;pointer-events:auto}
+    #prev-video-btn{left:10px}#next-video-btn{right:10px}
+
+    /* EXPLORE & SEARCH PANELS (full screen slides up) */
+    #explore-panel,#search-panel{
+        position:fixed;left:0;right:0;bottom:0;top:0;
+        padding:84px 12px 20px;
+        background: linear-gradient(180deg, rgba(6,6,8,0.88), rgba(10,10,12,0.96));
+        transform:translateY(110%);
+        transition:transform .36s cubic-bezier(.2,.9,.2,1);
+        z-index:55;overflow:auto;
+    }
+    #explore-panel.open,#search-panel.open{transform:translateY(0)}
+
+    /* Thumbnails grid — ALWAYS 2 columns on small screens (320px) */
+    #thumbnails-container,#search-results{
+        display:grid;
+        grid-template-columns:repeat(2,1fr);
+        gap:12px;
+    }
+
+    .thumbnail-wrapper{
+        border-radius:12px;overflow:hidden;
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        border:1px solid rgba(255,255,255,0.03);
+        box-shadow: 0 6px 30px rgba(0,0,0,0.45);
+        transition: transform .12s ease, box-shadow .12s;
+        position:relative;
+    }
+    .thumbnail-wrapper:active{transform:scale(.98)}
+    .thumbnail-wrapper img{width:100%;height:auto;display:block}
+    .thumbnail-overlay{
+        position:absolute;left:0;right:0;bottom:0;padding:8px 10px;
+        background: linear-gradient(transparent, rgba(0,0,0,0.84));
+        color:var(--text-light);font-size:13px;font-weight:700;
+    }
+
+    /* BOTTOM UI (controls) */
+    #bottom-ui{
+        position:fixed;
+        left:12px;
+        right:12px;
+        bottom:calc(var(--safe-bottom) + 12px);
+        padding:12px;
+        border-radius:14px;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        align-items:stretch;
+        backdrop-filter: blur(18px);
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        border:1px solid var(--glass-border);
+        z-index:45;
+        transition: opacity .36s ease;
+    }
+    .progress-container{width:100%;height:8px;background: rgba(255,255,255,0.04);border-radius:999px;overflow:hidden}
+    #progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent), #7ed1ff);transition:width .25s linear}
+
+    .controls-row{display:flex;gap:8px;align-items:center}
+    .control-btn{flex:1;display:inline-flex;gap:8px;align-items:center;justify-content:center;padding:10px;border-radius:12px;background: rgba(255,255,255,0.02);color:var(--text-light);border:1px solid rgba(255,255,255,0.03);cursor:pointer;font-weight:600;font-size:14px}
+    .control-btn:active{transform:scale(.97)}
+
+    /* Ads small */
+    #ad-container{display:flex;flex-direction:row;gap:10px;overflow:auto;padding:6px 0}
+    .ad-box{min-width:180px;height:56px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;padding:6px;color:var(--text-dim)}
+
+    /* Small screens adjustments */
+    @media (max-width:420px){
+        #parts-menu{width:260px}
+        #appbar{margin:0 10px;padding:6px;height:52px;border-radius:12px}
+        #title-bar{font-size:15px}
+        .control-btn{font-size:13px;padding:9px;border-radius:10px}
+        #bottom-ui{left:10px;right:10px;padding:10px;border-radius:12px}
+        #thumbnails-container,#search-results{gap:10px}
+    }
+
+    /* Ajustes para pantallas medianas (ej. tabletas en landscape) */
+    @media (min-width: 600px) {
+        #thumbnails-container, #search-results {
+        /* 3 columnas en pantallas medianas */
+        grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    /* Ajustes para pantallas grandes (ej. desktop) */
+    @media (min-width: 1024px) {
+        #explore-panel, #search-panel {
+        /* Hacer el panel flotar a la izquierda/derecha para no cubrir toda la vista */
+        max-width: 600px;
+        left: 50%;
+        transform: translate(-50%, 110%);
+        top: 0;
+        bottom: 0;
+        padding-top: 96px;
+        border-radius: 16px;
+        margin: 12px auto; /* Centrar el panel */
+        height: calc(100vh - 24px); /* Ajuste de altura */
+        }
+        #explore-panel.open, #search-panel.open {
+        /* Posición final de apertura en desktop */
+        transform: translate(-50%, 0%);
+        }
+        #thumbnails-container, #search-results {
+        /* 4 columnas en desktop */
+        grid-template-columns: repeat(4, 1fr);
+        }
+    }
+    
+    /* Nueva regla CSS para el contenedor interno de cada video-page */
+    .video-page-parts-container {
+        width: 100%;
+        height: 100vh;
+        overflow-y: auto; /* Permite el scroll vertical dentro de esta sección */
+        scroll-snap-type: y mandatory; /* Habilita el snap para las partes */
+    }
+    .video-page-parts-container::-webkit-scrollbar { width: 0; height: 0; }
+
+    </style>
+</head>
+<body>
+    <iframe id="player-frame" allow="autoplay; encrypted-media" allowfullscreen src="about:blank"></iframe>
+
+    <div id="appbar">
+        <button id="parts-menu-btn" class="app-btn" title="Partes" onclick="toggleMenu()">☰</button>
+        <div id="title-bar">Cargando título...</div>
+        <div style="display:flex;gap:8px;align-items:center">
+            <button id="explore-btn" class="app-btn" title="Explorar" onclick="toggleExplore()">
+                <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m4 12 8-8 8 8M6 10.5V19a1 1 0 0 0 1 1h3v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3h3a1 1 0 0 0 1-1v-8.5"/>
+</svg>
+
+            </button>
+            <button id="search-btn" class="app-btn app-btn--accent" title="Buscar" onclick="toggleSearch()">
+                <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+    <path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="m21 21-3.5-3.5M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/>
+</svg>
+
+            </button>
+        </div>
+    </div>
+
+    <div id="parts-menu" aria-hidden="true"></div>
+
+    <div id="explore-panel" aria-hidden="true">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="font-weight:700;font-size:18px">Explorar</div>
+            <button class="app-btn" onclick="toggleExplore()">✖</button>
+        </div>
+        <div id="thumbnails-container"></div>
+    </div>
+
+    <div id="search-panel" aria-hidden="true">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="font-weight:700;font-size:18px">Buscar</div>
+            <button class="app-btn" onclick="toggleSearch()">✖</button>
+        </div>
+        <input id="search-input" type="text" placeholder="Buscar video..." style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:var(--text-light);font-size:15px;margin-bottom:12px" />
+        <div id="search-results"></div>
+    </div>
+
+    <div id="tiktok-scroll-container" aria-hidden="false">
+    </div>
+
+    <div id="sound-btn" onclick="enableSound()">🔊 Toca para activar sonido</div>
+
+    <button id="prev-video-btn" title="Anterior Parte/Video" aria-label="Anterior Parte/Video" style="display: none;">◀</button>
+    <button id="next-video-btn" title="Siguiente Parte/Video" aria-label="Siguiente Parte/Video" style="display: none;">▶</button>
+
+    <div id="bottom-ui">
+        <div class="progress-container"><div id="progress-bar"></div></div>
+        <div class="controls-row" style="justify-content:space-between">
+            <button id="prev-part-mobile" class="control-btn" onclick="prevPart()">◀</button>
+            <button class="control-btn" onclick="back5()"><svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 16-4-4 4-4m-6 8-4-4 4-4"/>
+</svg>
+</button>
+            <button id="play-btn" class="control-btn" onclick="togglePlay()">⏸</button>
+            <button class="control-btn" onclick="skip5()">
+                <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m7 16 4-4-4-4m6 8 4-4-4-4"/>
+</svg>
+            </button>
+            <button id="next-part-mobile" class="control-btn" onclick="nextPart()">▶</button>
+        </div>
+        <div id="ad-container" aria-hidden="true"></div>
+    </div>
+
+<script>
+/* ============================
+    Variables y configuración
+    ============================ */
+let videoData = [], videoIndex = 0, videoId = "", partes = [], current = 0;
+let allowSound = false, progressInterval, currentProgress = 0, paused = false, hideTimeout;
+let partObserver; // Nuevo observador para las partes
+
+/* JSON con tu lista de videos */
+const JSON_URL = "https://raw.githubusercontent.com/johnclivergastonpascal/server_viewdiful/refs/heads/main/videos.json";
+
+/* Selectores cortos */
+const $ = id => document.getElementById(id);
+const scrollContainer = $('tiktok-scroll-container');
+const playerFrame = $('player-frame'); // Obtener el iframe
+
+/* ===== CARGAR JSON ===== */
+async function loadJSON(){
+    try {
+        const res = await fetch(JSON_URL);
+        videoData = await res.json();
+    } catch (err) {
+        console.error("Error cargando JSON:", err);
+        videoData = [];
+    }
+
+    // construir UI
+    buildScrollPages();
+    buildThumbnails(); // explorador
+    buildThumbnails('search-results', []); // iniciar vacío
+    if(videoData.length) loadVideo(0);
+    else $('title-bar').innerText = "No hay videos";
 }
 
+/* ===== Construir páginas tipo TikTok dinámicamente ===== */
+function buildScrollPages(){
+    scrollContainer.innerHTML = '';
+    // Desconectar el observador de partes si ya existe
+    if (partObserver) {
+        partObserver.disconnect();
+    }
+    
+    // Crear el nuevo observador para las partes
+    partObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            // Umbral > 0.6 para que detecte la parte principal centrada
+            if(entry.isIntersecting && entry.intersectionRatio > 0.6){
+                const newPartIndex = Number(entry.target.dataset.partIndex);
+                const newVideoIndex = Number(entry.target.closest('.video-page').dataset.index);
 
-    document.addEventListener("mousemove", showUI);
-    document.addEventListener("touchstart", showUI);
-    document.addEventListener("keydown", showUI);
+                // Solo cargar si el videoIndex ha cambiado O si la parte ha cambiado DENTRO del mismo video
+                if(!Number.isNaN(newVideoIndex) && newVideoIndex !== videoIndex){
+                    // Si el video cambia, la carga del video se encargará de cargar la parte 0
+                    loadVideo(newVideoIndex); 
+                } else if(!Number.isNaN(newPartIndex) && newPartIndex !== current && newVideoIndex === videoIndex) {
+                    // Si la parte cambia DENTRO del mismo video
+                    loadPart(newPartIndex);
+                }
+            }
+        });
+    }, { 
+        threshold: [0.25, 0.5, 0.6, 0.75],
+        root: null, // viewport
+        rootMargin: '0px'
+    });
+    
+    videoData.forEach((video, idx) => {
+        const page = document.createElement('section');
+        page.className = 'video-page';
+        page.dataset.index = idx;
+        
+        // Contenedor de scroll interno para las partes
+        const partsContainer = document.createElement('div');
+        partsContainer.className = 'video-page-parts-container';
 
-    loadJSON();
-  </script>
+        // Crear una "sección de parte" por cada parte del video
+        const videoPartes = video.partes || [{ parte: 1, inicio_seg: 0, duracion_seg: 300 }]; // Asegurar al menos 1 parte
+        
+        videoPartes.forEach((part, partIdx) => {
+            const partSection = document.createElement('div');
+            partSection.className = 'part-section';
+            partSection.dataset.partIndex = partIdx;
+
+            const inner = document.createElement('div');
+            inner.className = 'page-inner';
+
+            const thumb = document.createElement('div');
+            thumb.className = 'page-thumb';
+            // USANDO LA MINIATURA DEL JSON PARA EL FONDO DEL SCROLL
+            thumb.style.backgroundImage = `url("${ video.thumbnail ? 'https://raw.githubusercontent.com/johnclivergastonpascal/server_viewdiful/main/' + video.thumbnail : 'https://via.placeholder.com/720x1280?text=Sin+imagen' }")`;
+
+            const overlay = document.createElement('div');
+            overlay.className = 'page-overlay';
+
+            const left = document.createElement('div');
+            left.className = 'page-title';
+            left.textContent = (video.titulo ?? 'Sin título') + ` - Parte ${part.parte ?? (partIdx + 1)}`;
+
+            const right = document.createElement('div');
+            right.className = 'page-meta';
+            right.textContent = `Video: ${idx + 1}/${videoData.length} | Parte: ${partIdx + 1}/${videoPartes.length}`;
+
+            overlay.appendChild(left);
+            overlay.appendChild(right);
+
+            inner.appendChild(thumb);
+            inner.appendChild(overlay);
+            partSection.appendChild(inner);
+            
+            partsContainer.appendChild(partSection);
+            
+            // Observar cada sección de parte
+            partObserver.observe(partSection);
+        });
+
+        page.appendChild(partsContainer);
+        scrollContainer.appendChild(page);
+    });
+}
+
+/* ===== VIDEO + PARTES (MEJORADO) ===== */
+function loadVideo(index) {
+    if(!videoData.length) return;
+    if(index < 0) index = 0;
+    if(index >= videoData.length) index = videoData.length - 1;
+
+    // 1. Quitar clases de actividad/carga de todas las páginas y el iframe
+    document.querySelectorAll('.video-page').forEach(p => {
+        p.classList.remove('active');
+        p.classList.remove('loading');
+    });
+    playerFrame.classList.remove('active');
+    
+    videoIndex = index;
+    const video = videoData[videoIndex];
+    if(!video) return;
+
+    videoId = video.id;
+    partes = video.partes || [];
+    current = 0; // Siempre empezar por la primera parte al cambiar de video
+
+    $('title-bar').innerText = video.titulo ?? video.Title ?? 'Sin título';
+    buildPartsList();
+    resetAds();
+    
+    // 2. Marcar la página activa y ponerla en estado de carga (mostrará el spinner)
+    const currentPageElement = document.querySelector(`.video-page[data-index="${videoIndex}"]`);
+    if(currentPageElement) {
+        currentPageElement.classList.add('active');
+        currentPageElement.classList.add('loading');
+    }
+    
+    loadPart(current);
+}
+
+/* Load a specific part */
+function loadPart(i){
+    if(!partes || i < 0 || i >= partes.length) return;
+    current = i; paused = false; currentProgress = 0;
+    showUI();
+    $('play-btn').innerText = "⏸";
+    highlightCurrentPart();
+
+    // Actualizar el título y meta en la página activa
+    const currentPageElement = document.querySelector(`.video-page[data-index="${videoIndex}"]`);
+    if(currentPageElement) {
+        const titleEl = currentPageElement.querySelector('.page-title');
+        const metaEl = currentPageElement.querySelector('.page-meta');
+        const video = videoData[videoIndex];
+        
+        if (titleEl) titleEl.textContent = (video.titulo ?? 'Sin título') + ` - Parte ${partes[i].parte ?? (i + 1)}`;
+        if (metaEl) metaEl.textContent = `Video: ${videoIndex + 1}/${videoData.length} | Parte: ${i + 1}/${partes.length}`;
+        
+        // 2. Marcar la página activa y ponerla en estado de carga
+        currentPageElement.classList.add('active');
+        currentPageElement.classList.add('loading');
+    }
+
+    const part = partes[i];
+    const start = part.inicio_seg ?? part.Start ?? 0;
+    const duration = part.duracion_seg ?? part.Duration ?? 0;
+    
+    // 1. Cargar el iframe
+    setPlayer(start, duration, start);
+    
+    // 2. Simulación de carga: Mostrar el iframe después de un breve delay
+    setTimeout(() => {
+        // 2a. Hacer visible el iframe con la transición CSS
+        playerFrame.classList.add('active');
+        
+        // 2b. Quitar el indicador de carga de la página
+        if(currentPageElement) {
+            currentPageElement.classList.remove('loading');
+        }
+        
+        // 2c. Iniciar la barra de progreso
+        startProgress(duration);
+    }, 800); 
+}
+
+/* Progress handling */
+function startProgress(duration){
+    clearInterval(progressInterval);
+    const bar = $('progress-bar');
+    currentProgress = 0; bar.style.width='0%';
+    const total = Math.max(1, duration);
+    progressInterval = setInterval(() => {
+        if(paused) return;
+        currentProgress++;
+        bar.style.width = ((currentProgress / total) * 100) + '%';
+        if(currentProgress >= total) {
+            clearInterval(progressInterval);
+            nextPart(); // Al terminar la parte, intenta ir a la siguiente parte
+        }
+    }, 1000);
+}
+
+/* Helpers for +/-5s */
+function adjustTime(offset){
+    const part = partes[current];
+    if(!part) return;
+    const start = part.inicio_seg ?? part.Start ?? 0;
+    const duration = part.duracion_seg ?? part.Duration ?? 0;
+    let newPos = start + currentProgress + offset;
+    if(newPos < start) newPos = start;
+    
+    // Si saltas más allá del final de la parte, avanza a la siguiente parte
+    if(newPos >= start + duration) {
+        return nextPart();
+    }
+    
+    setPlayer(start, duration, newPos);
+    restartProgressFrom(newPos - start);
+}
+function back5(){ adjustTime(-5); }
+function skip5(){ adjustTime(5); }
+
+/* Restart progress from sec */
+function restartProgressFrom(sec){
+    clearInterval(progressInterval);
+    const duration = partes[current].duracion_seg ?? partes[current].Duration ?? 0;
+    const total = Math.max(1, duration);
+    const bar = $('progress-bar');
+    currentProgress = Math.max(0, sec);
+    bar.style.width = ((currentProgress / total) * 100) + '%';
+    progressInterval = setInterval(() => {
+        if(paused) return;
+        currentProgress++;
+        bar.style.width = ((currentProgress / total) * 100) + '%';
+        if(currentProgress >= total) {
+            clearInterval(progressInterval);
+            nextPart();
+        }
+    }, 1000);
+}
+
+/* Toggle play/pause (CORREGIDO: Limpia el iframe para detener el audio) */
+function togglePlay(){
+    const btn = $('play-btn'); 
+    
+    paused = !paused;
+    btn.innerText = paused ? "▶" : "⏸";
+
+    if(paused) {
+        playerFrame.classList.remove('active');
+        playerFrame.src = 'about:blank'; 
+        clearInterval(progressInterval);
+    } else {
+        restartPartFromProgress();
+    }
+}
+
+/* Reinicia la parte actual desde la posición guardada */
+function restartPartFromProgress(){
+    if(!partes || current < 0 || current >= partes.length) return;
+    showUI();
+    $('play-btn').innerText = "⏸";
+    highlightCurrentPart();
+
+    const part = partes[current];
+    const start = part.inicio_seg ?? part.Start ?? 0;
+    const duration = part.duracion_seg ?? part.Duration ?? 0;
+    
+    const newStartTime = start + currentProgress;
+    
+    // 1. Cargar el iframe con el nuevo punto de inicio
+    setPlayer(start, duration, newStartTime);
+    
+    // 2. Simulación de carga (mantener el mismo efecto visual de carga)
+    const currentPageElement = document.querySelector(`.video-page[data-index="${videoIndex}"]`);
+    if(currentPageElement) currentPageElement.classList.add('loading');
+
+    setTimeout(() => {
+        // 2a. Hacer visible el iframe
+        playerFrame.classList.add('active');
+        
+        // 2b. Quitar el indicador de carga
+        if(currentPageElement) currentPageElement.classList.remove('loading');
+        
+        // 2c. Reiniciar la barra de progreso desde donde se quedó
+        restartProgressFrom(currentProgress);
+    }, 800);
+}
+
+/* next/prev part (LÓGICA CLAVE MODIFICADA) */
+function nextPart(){
+    if(current < (partes.length - 1)) {
+        // Ir a la siguiente PARTE
+        loadPart(current + 1);
+        // Desplazar el scroll interno a la nueva parte
+        scrollToPart(videoIndex, current + 1);
+    } else {
+        // Si no hay más partes, saltar al siguiente VIDEO en scroll principal
+        const nextIndex = (videoIndex + 1) % videoData.length;
+        scrollToVideo(nextIndex);
+    }
+}
+function prevPart(){
+    if(current > 0) {
+        // Ir a la anterior PARTE
+        loadPart(current - 1);
+        // Desplazar el scroll interno a la nueva parte
+        scrollToPart(videoIndex, current - 1);
+    } else {
+        // Si es la primera parte, saltar al video anterior
+        const prevIndex = (videoIndex - 1 + videoData.length) % videoData.length;
+        scrollToVideo(prevIndex);
+        
+        // Si saltamos al video anterior, cargamos su *última* parte
+        const prevVideo = videoData[prevIndex];
+        const prevPartes = prevVideo.partes || [];
+        if(prevPartes.length > 0) {
+            // Un pequeño timeout para asegurar que loadVideo se ha ejecutado
+            setTimeout(() => {
+                 loadPart(prevPartes.length - 1);
+            }, 500); 
+        }
+    }
+}
+
+/* Parts list */
+function buildPartsList(){
+    const menu = $('parts-menu');
+    menu.innerHTML = '';
+    (partes || []).forEach((p, i) => {
+        const div = document.createElement('div');
+        div.className = 'part-item';
+        div.innerText = `Parte ${p.parte ?? (i+1)}`;
+        div.onclick = () => { 
+            loadPart(i); 
+            scrollToPart(videoIndex, i); // Desplazar al seleccionar del menú
+            toggleMenu(); 
+        };
+        menu.appendChild(div);
+    });
+    highlightCurrentPart();
+}
+function highlightCurrentPart(){
+    document.querySelectorAll('.part-item').forEach((el, idx) => el.classList.toggle('active', idx === current));
+}
+
+/* SOUND */
+function enableSound(){
+    allowSound = true;
+    const s = $('sound-btn'); if(s) s.style.display = 'none';
+    loadPart(current);
+}
+
+/* Set iframe src helper */
+function setPlayer(start, duration, pos){
+    const end = start + duration - 0.1;
+    const unique = Date.now();
+    playerFrame.src = `https://www.youtube.com/embed/${videoId}?start=${pos}&end=${end}&autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1&mute=${allowSound?0:1}&v=${unique}`;
+}
+
+/* ADS (placeholders) */
+function resetAds(){
+    const container = $('ad-container');
+    container.innerHTML = '';
+    if(window.adInterval) clearInterval(window.adInterval);
+    loadAd();
+}
+function loadAd(){
+    createAds(1);
+    window.adInterval = setInterval(()=> createAds(6), 2500);
+}
+function createAds(count){
+    const container = $('ad-container');
+    for(let i=0;i<count;i++){
+        const box = document.createElement('div');
+        box.className = 'ad-box';
+        box.innerText = 'Publicidad';
+        container.appendChild(box);
+    }
+}
+
+/* THUMBNAILS / SEARCH GRID */
+function buildThumbnails(containerId = 'thumbnails-container', data = videoData, clickFn = (idx)=> scrollToVideo(idx) ){
+    const container = $(containerId);
+    if(!container) return;
+    container.innerHTML = '';
+    (data || []).forEach((video, index) => {
+        const wrapper = document.createElement('div'); wrapper.className = 'thumbnail-wrapper';
+        const img = document.createElement('img');
+        // USANDO LA MINIATURA DEL JSON PARA LAS GRILLAS DE EXPLORAR/BUSCAR
+        img.src = video.thumbnail ? `https://raw.githubusercontent.com/johnclivergastonpascal/server_viewdiful/main/${video.thumbnail}` : 'https://via.placeholder.com/320x180?text=Sin+imagen';
+        img.alt = video.titulo ?? 'Sin título';
+        img.loading = 'lazy';
+        img.onerror = () => img.src='https://via.placeholder.com/320x180?text=Sin+imagen';
+        const overlay = document.createElement('div'); overlay.className = 'thumbnail-overlay';
+        overlay.innerText = `${video.titulo ?? "Sin título"} · ${video.partes?.length ?? 0} partes`;
+
+        wrapper.appendChild(img);
+        wrapper.appendChild(overlay);
+        wrapper.onclick = () => clickFn(index);
+        container.appendChild(wrapper);
+    });
+}
+
+/* SEARCH logic */
+const searchInput = $('search-input');
+if(searchInput){
+    searchInput.addEventListener('input', ()=> {
+        const q = (searchInput.value || '').toLowerCase();
+        buildSearchResults(q);
+    });
+}
+function buildSearchResults(query){
+    const results = (videoData || []).filter(v => (v.titulo||'').toLowerCase().includes(query));
+    buildThumbnails('search-results', results, (localIndex) => {
+        // find the global index for the selected result
+        const item = results[localIndex];
+        if(!item) return;
+        const global = videoData.findIndex(v => v.id === item.id);
+        if(global >= 0) {
+            toggleSearch();
+            scrollToVideo(global);
+        }
+    });
+}
+
+/* UI show/hide logic (auto-hide controls) */
+function showUI(){
+    const appbar = $('appbar'), bottom = $('bottom-ui'), explore = $('explore-panel'), search = $('search-panel'), parts = $('parts-menu');
+    appbar.style.top = `calc(var(--safe-top) + 8px)`;
+    bottom.style.opacity = '1';
+    $('prev-video-btn').classList.add('visible'); $('next-video-btn').classList.add('visible');
+
+    [explore,search,parts].forEach(p => p && p.classList.remove('hidden'));
+
+    clearTimeout(hideTimeout);
+    hideTimeout = setTimeout(()=> {
+        appbar.style.top = `-120px`;
+        bottom.style.opacity = '0';
+        $('prev-video-btn').classList.remove('visible'); $('next-video-btn').classList.remove('visible');
+        [explore,search,parts].forEach(p => { if(p){ p.classList.remove('open'); p.classList.add('hidden'); }});
+    }, 4200);
+}
+
+/* Toggle panels */
+function toggleMenu(){ $('parts-menu').classList.toggle('open'); showUI(); }
+function toggleExplore(){ $('explore-panel').classList.toggle('open'); showUI(); }
+function toggleSearch(){ const p = $('search-panel'); p.classList.toggle('open'); if(p.classList.contains('open')) { $('search-input').focus(); buildSearchResults(''); } showUI(); }
+
+/* Prev/Next global buttons ahora llaman a nextPart/prevPart */
+$('prev-video-btn').addEventListener('click', prevPart);
+$('next-video-btn').addEventListener('click', nextPart);
+
+/* Scroll to a specific video index with smooth snap */
+function scrollToVideo(index){
+    const page = document.querySelector(`.video-page[data-index="${index}"]`);
+    if(page){
+        scrollContainer.scrollTop = page.offsetTop;
+        loadVideo(index);
+    }
+}
+
+/* Nuevo: Scroll a una parte específica dentro del video */
+function scrollToPart(videoIndex, partIndex){
+    const videoPage = document.querySelector(`.video-page[data-index="${videoIndex}"]`);
+    if(videoPage){
+        const partsContainer = videoPage.querySelector('.video-page-parts-container');
+        const partSection = partsContainer.querySelector(`.part-section[data-part-index="${partIndex}"]`);
+        
+        if(partsContainer && partSection){
+            // Aseguramos que el contenedor del video esté visible
+            scrollContainer.scrollTop = videoPage.offsetTop;
+            // Desplazamos el contenedor de partes interno
+            partsContainer.scrollTop = partSection.offsetTop;
+            
+            // Si la parte no está activa, la cargamos (aunque el observer ya debería hacerlo)
+            if(partIndex !== current) {
+                setTimeout(() => loadPart(partIndex), 420);
+            }
+        }
+    }
+}
+
+/* Interaction to show UI */
+document.addEventListener('mousemove', showUI, {passive:true});
+document.addEventListener('touchstart', showUI, {passive:true});
+document.addEventListener('keydown', showUI);
+
+/* Initialize */
+loadJSON();
+</script>
+</body>
+</html>
