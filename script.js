@@ -1,7 +1,6 @@
-
 /* ============================
-    Variables y configuración
-    ============================ */
+ *     Variables y configuración
+ *     ============================ */
 let videoData = [], videoIndex = 0, videoId = "", partes = [], current = 0;
 let allowSound = false, progressInterval, currentProgress = 0, paused = false, hideTimeout;
 let partObserver; // Nuevo observador para las partes
@@ -48,16 +47,15 @@ function buildScrollPages(){
                 const newPartIndex = Number(entry.target.dataset.partIndex);
                 const newVideoIndex = Number(entry.target.closest('.video-page').dataset.index);
 
-                // Solo cargar si el videoIndex ha cambiado O si la parte ha cambiado DENTRO del mismo video
-                if(!Number.isNaN(newVideoIndex) && newVideoIndex !== videoIndex){
-                    // Si el video cambia, la carga del video se encargará de cargar la parte 0
+                // **CORRECCIÓN LÓGICA:** if(!Number.isNaN(newVideoIndex) && newVideoIndex !== videoIndex){
+                    // Si el video cambia, cargamos el video. Esto siempre cargará la parte 0.
                     loadVideo(newVideoIndex); 
                 } else if(!Number.isNaN(newPartIndex) && newPartIndex !== current && newVideoIndex === videoIndex) {
-                    // Si la parte cambia DENTRO del mismo video
+                    // Si solo la parte cambia DENTRO del mismo video
                     loadPart(newPartIndex);
                 }
             }
-        });
+        );
     }, { 
         threshold: [0.25, 0.5, 0.6, 0.75],
         root: null, // viewport
@@ -128,6 +126,9 @@ function loadVideo(index) {
     document.querySelectorAll('.video-page').forEach(p => {
         p.classList.remove('active');
         p.classList.remove('loading');
+        // **CORRECCIÓN:** Resetear el scroll interno del contenedor de partes
+        const partsContainer = p.querySelector('.video-page-parts-container');
+        if(partsContainer) partsContainer.scrollTop = 0;
     });
     playerFrame.classList.remove('active');
     
@@ -156,12 +157,16 @@ function loadVideo(index) {
 /* Load a specific part */
 function loadPart(i){
     if(!partes || i < 0 || i >= partes.length) return;
-    current = i; paused = false; currentProgress = 0;
+
+    resetAds(); // ← reiniciar anuncios al cambiar de parte
+
+    current = i; 
+    paused = false; 
+    currentProgress = 0;
     showUI();
     $('play-btn').innerText = "⏸";
     highlightCurrentPart();
 
-    // Actualizar el título y meta en la página activa
     const currentPageElement = document.querySelector(`.video-page[data-index="${videoIndex}"]`);
     if(currentPageElement) {
         const titleEl = currentPageElement.querySelector('.page-title');
@@ -171,7 +176,7 @@ function loadPart(i){
         if (titleEl) titleEl.textContent = (video.titulo ?? 'Sin título') + ` - Parte ${partes[i].parte ?? (i + 1)}`;
         if (metaEl) metaEl.textContent = `Video: ${videoIndex + 1}/${videoData.length} | Parte: ${i + 1}/${partes.length}`;
         
-        // 2. Marcar la página activa y ponerla en estado de carga
+        // Aseguramos que la clase 'active' se mantenga
         currentPageElement.classList.add('active');
         currentPageElement.classList.add('loading');
     }
@@ -180,23 +185,17 @@ function loadPart(i){
     const start = part.inicio_seg ?? part.Start ?? 0;
     const duration = part.duracion_seg ?? part.Duration ?? 0;
     
-    // 1. Cargar el iframe
     setPlayer(start, duration, start);
-    
-    // 2. Simulación de carga: Mostrar el iframe después de un breve delay
+
     setTimeout(() => {
-        // 2a. Hacer visible el iframe con la transición CSS
         playerFrame.classList.add('active');
-        
-        // 2b. Quitar el indicador de carga de la página
         if(currentPageElement) {
             currentPageElement.classList.remove('loading');
         }
-        
-        // 2c. Iniciar la barra de progreso
         startProgress(duration);
     }, 800); 
 }
+
 
 /* Progress handling */
 function startProgress(duration){
@@ -306,9 +305,10 @@ function restartPartFromProgress(){
 function nextPart(){
     if(current < (partes.length - 1)) {
         // Ir a la siguiente PARTE
-        loadPart(current + 1);
+        const nextPartIndex = current + 1;
+        loadPart(nextPartIndex);
         // Desplazar el scroll interno a la nueva parte
-        scrollToPart(videoIndex, current + 1);
+        scrollToPart(videoIndex, nextPartIndex);
     } else {
         // Si no hay más partes, saltar al siguiente VIDEO en scroll principal
         const nextIndex = (videoIndex + 1) % videoData.length;
@@ -318,9 +318,10 @@ function nextPart(){
 function prevPart(){
     if(current > 0) {
         // Ir a la anterior PARTE
-        loadPart(current - 1);
+        const prevPartIndex = current - 1;
+        loadPart(prevPartIndex);
         // Desplazar el scroll interno a la nueva parte
-        scrollToPart(videoIndex, current - 1);
+        scrollToPart(videoIndex, prevPartIndex);
     } else {
         // Si es la primera parte, saltar al video anterior
         const prevIndex = (videoIndex - 1 + videoData.length) % videoData.length;
@@ -330,9 +331,12 @@ function prevPart(){
         const prevVideo = videoData[prevIndex];
         const prevPartes = prevVideo.partes || [];
         if(prevPartes.length > 0) {
+            const lastPartIndex = prevPartes.length - 1;
             // Un pequeño timeout para asegurar que loadVideo se ha ejecutado
             setTimeout(() => {
-                 loadPart(prevPartes.length - 1);
+                // Forzar la carga y el scroll a la última parte
+                loadPart(lastPartIndex);
+                scrollToPart(prevIndex, lastPartIndex);
             }, 500); 
         }
     }
@@ -348,7 +352,8 @@ function buildPartsList(){
         div.innerText = `Parte ${p.parte ?? (i+1)}`;
         div.onclick = () => { 
             loadPart(i); 
-            scrollToPart(videoIndex, i); // Desplazar al seleccionar del menú
+            // Mantener la llamada a loadPart aquí para el menú, ya que no depende del observer
+            scrollToPart(videoIndex, i, true); // Usar flag de forzar scroll/carga si es necesario
             toggleMenu(); 
         };
         menu.appendChild(div);
@@ -372,42 +377,39 @@ function setPlayer(start, duration, pos){
     const unique = Date.now();
     playerFrame.src = `https://www.youtube.com/embed/${videoId}?start=${pos}&end=${end}&autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1&mute=${allowSound?0:1}&v=${unique}`;
 }
-// ... [CÓDIGO ANTERIOR] ...
 
-/* ADS (placeholders) */
-function resetAds(){
+/* CONFIG DE ADS (se mantiene igual) */
+const MAX_ADS = 10;
+
+function resetAds() {
     const container = $('ad-container');
     container.innerHTML = '';
-    // Limpiamos el intervalo existente
-    if(window.adInterval) clearInterval(window.adInterval);
-    // Cargamos el código de anuncios una sola vez
+    if (window.adInterval) clearInterval(window.adInterval);
     loadAd();
 }
 
-function loadAd(){
-    // 1. Crear el contenedor principal de los 10 anuncios
-    const container = $('ad-container');
-    
-    // 2. Crear y añadir 10 contenedores individuales con tu script
-    const AD_LIMIT = 10;
-    for(let i = 0; i < AD_LIMIT; i++){
-        createAdBox(container);
-    }
-    
-    // NOTA: Como estamos usando un código de anuncio estático, no necesitamos un 'intervalo' para generar más anuncios, solo cargamos los 10 al inicio.
+function loadAd() {
+    createAds(1);
+    window.adInterval = setInterval(() => createAds(2), 2500);
 }
 
-function createAdBox(container){
-    // Contenedor que imita la caja de anuncio original
-    const box = document.createElement('div');
-    box.className = 'ad-box';
-    box.style.minWidth = '468px'; // Ajustamos el ancho al tamaño del anuncio (468x60)
-    box.style.height = '60px';   // Ajustamos la altura al tamaño del anuncio (468x60)
-    box.style.padding = '0';     // Quitamos padding para que el iframe encaje
+function createAds(count) {
+    const container = $('ad-container');
 
-    // El código que tú proporcionaste:
-    const adCode = `
-        <script type="text/javascript">
+    if (container.children.length >= MAX_ADS) {
+        if (window.adInterval) clearInterval(window.adInterval);
+        return;
+    }
+
+    for (let i = 0; i < count; i++) {
+        if (container.children.length >= MAX_ADS) break;
+
+        const box = document.createElement('div');
+        box.className = 'ad-box';
+
+        // Agregar script 1 (config)
+        const scriptConfig = document.createElement("script");
+        scriptConfig.innerHTML = `
             atOptions = {
                 'key' : '9a8c9978fb1543656fe2727727a4e06f',
                 'format' : 'iframe',
@@ -415,22 +417,20 @@ function createAdBox(container){
                 'width' : 468,
                 'params' : {}
             };
-        </script>
-        <script type="text/javascript" src="//www.highperformanceformat.com/9a8c9978fb1543656fe2727727a4e06f/invoke.js"></script>
-    `;
-    
-    // Usamos insertAdjacentHTML para que los scripts se ejecuten correctamente
-    box.insertAdjacentHTML('beforeend', adCode);
+        `;
 
-    container.appendChild(box);
+        // Agregar script 2 (invoke.js)
+        const scriptInvoke = document.createElement("script");
+        scriptInvoke.src = "//www.highperformanceformat.com/9a8c9978fb1543656fe2727727a4e06f/invoke.js";
+
+        box.appendChild(scriptConfig);
+        box.appendChild(scriptInvoke);
+        container.appendChild(box);
+    }
 }
 
-// Las funciones loadAd y createAds reemplazan a las anteriores
-// function createAds(count){ ... } // ESTA FUNCIÓN FUE ELIMINADA.
 
-// ... [CÓDIGO POSTERIOR] ...
-
-/* THUMBNAILS / SEARCH GRID */
+/* THUMBNAILS / SEARCH GRID (se mantiene igual) */
 function buildThumbnails(containerId = 'thumbnails-container', data = videoData, clickFn = (idx)=> scrollToVideo(idx) ){
     const container = $(containerId);
     if(!container) return;
@@ -507,12 +507,16 @@ function scrollToVideo(index){
     const page = document.querySelector(`.video-page[data-index="${index}"]`);
     if(page){
         scrollContainer.scrollTop = page.offsetTop;
+        // **CORRECCIÓN:** Asegurar que el scroll interno se resetea a 0 al saltar a un video.
+        const partsContainer = page.querySelector('.video-page-parts-container');
+        if(partsContainer) partsContainer.scrollTop = 0; 
+
         loadVideo(index);
     }
 }
 
 /* Nuevo: Scroll a una parte específica dentro del video */
-function scrollToPart(videoIndex, partIndex){
+function scrollToPart(videoIndex, partIndex, forceLoad = false){
     const videoPage = document.querySelector(`.video-page[data-index="${videoIndex}"]`);
     if(videoPage){
         const partsContainer = videoPage.querySelector('.video-page-parts-container');
@@ -524,9 +528,9 @@ function scrollToPart(videoIndex, partIndex){
             // Desplazamos el contenedor de partes interno
             partsContainer.scrollTop = partSection.offsetTop;
             
-            // Si la parte no está activa, la cargamos (aunque el observer ya debería hacerlo)
-            if(partIndex !== current) {
-                setTimeout(() => loadPart(partIndex), 420);
+            // **CORRECCIÓN:** La carga es responsabilidad del IntersectionObserver, excepto si se fuerza (ej. menú).
+            if(forceLoad && partIndex !== current) {
+                setTimeout(() => loadPart(partIndex), 100);
             }
         }
     }

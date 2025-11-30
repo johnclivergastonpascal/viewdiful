@@ -50,7 +50,12 @@
     <div id="tiktok-scroll-container" aria-hidden="false">
     </div>
 
-    <div id="sound-btn" onclick="enableSound()">🔊 Toca para activar sonido</div>
+    <div id="sound-btn" onclick="enableSound()">
+		<svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.5 8.43A4.985 4.985 0 0 1 17 12a4.984 4.984 0 0 1-1.43 3.5m2.794 2.864A8.972 8.972 0 0 0 21 12a8.972 8.972 0 0 0-2.636-6.364M12 6.135v11.73a1 1 0 0 1-1.64.768L6 15H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h2l4.36-3.633a1 1 0 0 1 1.64.768Z"/>
+</svg>
+ 
+		Toca para activar sonido</div>
 
     <button id="prev-video-btn" title="Anterior Parte/Video" aria-label="Anterior Parte/Video" style="display: none;">◀</button>
     <button id="next-video-btn" title="Siguiente Parte/Video" aria-label="Siguiente Parte/Video" style="display: none;">▶</button>
@@ -58,18 +63,33 @@
     <div id="bottom-ui">
         <div class="progress-container"><div id="progress-bar"></div></div>
         <div class="controls-row" style="justify-content:space-between">
-            <button id="prev-part-mobile" class="control-btn" onclick="prevPart()">◀</button>
-            <button class="control-btn" onclick="back5()"><svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+            <button id="prev-part-mobile" class="control-btn" onclick="prevPart()">
+				<svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/>
+</svg>
+
+			</button>
+            <button class="control-btn" onclick="back5()">
+				<svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 16-4-4 4-4m-6 8-4-4 4-4"/>
 </svg>
 </button>
-            <button id="play-btn" class="control-btn" onclick="togglePlay()">⏸</button>
+            <button id="play-btn" class="control-btn" onclick="togglePlay()">
+<svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6H8a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1Zm7 0h-1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1Z"/>
+</svg>
+			</button>
             <button class="control-btn" onclick="skip5()">
                 <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m7 16 4-4-4-4m6 8 4-4-4-4"/>
 </svg>
             </button>
-            <button id="next-part-mobile" class="control-btn" onclick="nextPart()">▶</button>
+            <button id="next-part-mobile" class="control-btn" onclick="nextPart()">
+				<svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/>
+</svg>
+
+			</button>
         </div>
         <div id="ad-container" aria-hidden="true"></div>
     </div>

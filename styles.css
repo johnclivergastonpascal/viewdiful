@@ -363,4 +363,6 @@
     }
     .video-page-parts-container::-webkit-scrollbar { width: 0; height: 0; }
 
-    
+    #ad-container {
+    overflow: hidden !important;
+}
