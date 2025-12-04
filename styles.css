@@ -15,6 +15,10 @@
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%}
     body{
+        /* Impide el zoom en iOS al tocar */
+    touch-action: pan-y; 
+    /* El -webkit-overflow-scrolling: touch permite un desplazamiento inercial mejor en iOS */
+    -webkit-overflow-scrolling: touch;
         font-family: -apple-system, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
         background: linear-gradient(180deg, #000 0%, #050505 100%);
         color:var(--text-light);
