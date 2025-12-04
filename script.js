@@ -4,6 +4,7 @@
 let videoData = [], videoIndex = 0, videoId = "", partes = [], current = 0;
 let allowSound = false, progressInterval, currentProgress = 0, paused = false, hideTimeout;
 let partObserver; // Observador para detectar cuándo una parte del video está visible.
+let isHandlingRoute = false; // Flag para prevenir loops entre loadVideo/loadPart y hashchange
 
 /* Configuración de Paginación */
 const LIMIT = 10;
@@ -38,15 +39,18 @@ async function loadJSON(){
     buildThumbnails(); 
     buildThumbnails('search-results', []); 
 
-    // 4. 🔥 CAMBIO CLAVE: Cargar un video ALEATORIO en lugar del primero (videoIndex 0)
+    // 4. 🔥 CAMBIO CLAVE: Manejar la ruta o cargar aleatorio
     if(videoData.length) {
-        await loadRandomVideo();
+        if (!handleRoute()) {
+            // Si no hay ruta o es inválida, cargamos el video aleatorio
+            await loadRandomVideo();
+        }
     } else {
         $('title-bar').innerText = "No hay videos o la API no responde";
     }
 }
 
-// --- FUNCIÓN PARA CARGAR PÁGINAS ESPECÍFICAS ---
+// --- FUNCIÓN PARA CARGAR PÁGINAS ESPECÍFICAS (Se mantiene igual) ---
 async function loadPage(pageNumber) {
     const loadMoreButton = $('load-more-btn');
     // Si ya sabemos que no hay más (y no es la primera carga), terminamos.
@@ -91,10 +95,7 @@ async function loadPage(pageNumber) {
             buildScrollPages(startIdx); // Pasar el índice de inicio
         }
 
-        // 4. 🔥 MODIFICACIÓN: Ya no cargamos el primer video aquí (loadVideo(0)),
-        // eso lo hará loadRandomVideo() en loadJSON().
-
-        // 5. Actualizar el explorador de miniaturas si está abierto y sincronizar clones
+        // 4. Actualizar el explorador de miniaturas si está abierto y sincronizar clones
         if ($('explore-panel')?.classList.contains('open')) {
             buildThumbnails('thumbnails-container', videoData);
         }
@@ -125,7 +126,7 @@ async function loadPage(pageNumber) {
     }
 }
 
-// --- FUNCIÓN PARA CREAR Y CONFIGURAR EL BOTÓN "VER MÁS" ---
+// --- FUNCIÓN PARA CREAR Y CONFIGURAR EL BOTÓN "VER MÁS" (Se mantiene igual) ---
 function setupLoadMoreButton() {
     let loadMoreButton = $('load-more-btn');
     
@@ -163,7 +164,7 @@ function setupLoadMoreButton() {
     updateLoadMoreButtonClones(loadMoreButton);
 }
 
-// --- FUNCIÓN HELPER PARA CLONAR Y SINCRONIZAR EL BOTÓN ---
+// --- FUNCIÓN HELPER PARA CLONAR Y SINCRONIZAR EL BOTÓN (Se mantiene igual) ---
 function updateLoadMoreButtonClones(originalButton) {
     const explorerContainer = $('explore-load-more');
     const searchContainer = $('search-load-more');
@@ -209,7 +210,79 @@ function updateLoadMoreButtonClones(originalButton) {
 }
 
 // ====================================================================
-// ===== FUNCIONALIDAD DE VIDEO ALEATORIO =============================
+// ===== FUNCIONALIDAD DE RUTAS (NUEVO) ===============================
+// ====================================================================
+
+/**
+ * 1. Lee el hash de la URL.
+ * 2. Carga el video y la parte especificados.
+ * @returns {boolean} true si la ruta fue manejada con éxito, false en caso contrario.
+ */
+function handleRoute() {
+    const hash = window.location.hash.substring(1); // Elimina el '#'
+    if (!hash) return false;
+
+    // Ejemplo de hash: video-ID_DEL_VIDEO/part-INDEX_DE_PARTE
+    const match = hash.match(/^video-([a-fA-F0-9-]+)(?:\/part-(\d+))?$/);
+
+    if (match) {
+        const routeVideoId = match[1];
+        let routePartIndex = match[2] ? parseInt(match[2], 10) : 0;
+
+        // Buscar el índice del video por su ID
+        const globalIndex = videoData.findIndex(v => v.id === routeVideoId);
+
+        if (globalIndex !== -1) {
+            isHandlingRoute = true; // Establecer flag para evitar bucle
+            
+            // Asegurar que la parte sea válida
+            const video = videoData[globalIndex];
+            const videoPartes = video.partes || video.Segments || [];
+            if (routePartIndex >= videoPartes.length) {
+                routePartIndex = 0;
+            }
+            
+            console.log(`Ruta encontrada. Cargando video ${globalIndex} (${routeVideoId}), parte ${routePartIndex}.`);
+            
+            // Desplazarse al video y cargar la parte
+            scrollToVideo(globalIndex, false); // No forzar loadVideo, lo hará scrollToVideo
+            
+            // Ahora, forzar la carga de la parte si es necesario.
+            const partToLoad = routePartIndex;
+            setTimeout(() => {
+                // Sincroniza la posición de scroll interno de la página de video
+                scrollToPart(globalIndex, partToLoad, true); 
+                // loadPart(partToLoad); // scrollToPart ya llama a loadPart(forceLoad=true)
+                isHandlingRoute = false;
+            }, 50);
+
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Actualiza la URL del navegador con el ID del video y la parte actual.
+ * @param {string} vidId - El ID del video.
+ * @param {number} pIndex - El índice de la parte.
+ */
+function updateRoute(vidId, pIndex) {
+    if (isHandlingRoute) return; // Evita que se actualice la URL mientras la estamos leyendo/manejando
+
+    const newHash = `video-${vidId}/part-${pIndex}`;
+    
+    // Solo actualizar si la ruta es diferente
+    if (window.location.hash.substring(1) !== newHash) {
+        // Usamos replaceState o pushState, pero como estamos usando hashes, simplemente asignamos:
+        window.location.hash = newHash;
+    }
+}
+
+
+// ====================================================================
+// ===== FUNCIONALIDAD DE VIDEO ALEATORIO (Se mantiene igual) =========
 // ====================================================================
 
 /**
@@ -244,12 +317,9 @@ async function loadRandomVideo() {
             existingIndex = 0; // El nuevo índice es 0
             
             // Reconstruir TODAS las páginas de scroll desde el inicio para incluir el nuevo video
-            // Esto es más simple y seguro que manejar la inserción dinámica.
             const scrollContainer = $('tiktok-scroll-container');
             if (scrollContainer) scrollContainer.innerHTML = '';
             buildScrollPages(0);
-
-            // Nota: No actualizamos currentPage/hasMore, ya que este es un video especial.
         }
         
         // 3. Desplazarse al video y cargarlo
@@ -271,7 +341,7 @@ async function loadRandomVideo() {
 
 // --------------------------------------------------------------------
 
-/* ===== Construir páginas tipo TikTok dinámicamente ===== */
+/* ===== Construir páginas tipo TikTok dinámicamente (Se mantiene igual) ===== */
 function buildScrollPages(startIdx = 0){
     if (!scrollContainer) return;
     
@@ -367,7 +437,7 @@ function buildScrollPages(startIdx = 0){
 }
 
 
-/* ===== VIDEO + PARTES (Se mantiene igual) ===== */
+/* ===== VIDEO + PARTES (Modificado para rutas) ===== */
 function loadVideo(index) {
     if(!videoData.length) return;
     if(index < 0) index = 0;
@@ -391,6 +461,9 @@ function loadVideo(index) {
     partes = video.partes || video.Segments || []; 
     current = 0; // Siempre empezar por la primera parte al cambiar de video
 
+    // 🔥 ACTUALIZAR RUTA: Al cargar un nuevo video, siempre vamos a la parte 0
+    updateRoute(videoId, current); 
+
     $('title-bar').innerText = video.titulo ?? video.Title ?? 'Sin título';
     buildPartsList();
     resetAds();
@@ -405,7 +478,7 @@ function loadVideo(index) {
     loadPart(current);
 }
 
-/* Load a specific part (Se mantiene igual) */
+/* Load a specific part (Modificado para rutas) */
 function loadPart(i){
     if(!partes || i < 0 || i >= partes.length) return;
 
@@ -421,6 +494,9 @@ function loadPart(i){
         </svg>
     `;
     highlightCurrentPart();
+
+    // 🔥 ACTUALIZAR RUTA: Al cargar una nueva parte
+    updateRoute(videoId, current);
 
     const currentPageElement = document.querySelector(`.video-page[data-index="${videoIndex}"]`);
     if(currentPageElement) {
@@ -451,7 +527,7 @@ function loadPart(i){
 }
 
 
-/* Progress handling (Se mantiene igual) */
+/* Progress handling (Se mantienen iguales) */
 function startProgress(duration){
     clearInterval(progressInterval);
     const bar = $('progress-bar');
@@ -467,8 +543,6 @@ function startProgress(duration){
         }
     }, 1000);
 }
-
-/* Helpers for +/-5s (Se mantienen iguales) */
 function adjustTime(offset){
     const part = partes[current];
     if(!part) return;
@@ -486,8 +560,6 @@ function adjustTime(offset){
 }
 function back5(){ adjustTime(-5); }
 function skip5(){ adjustTime(5); }
-
-/* Restart progress from sec (Se mantiene igual) */
 function restartProgressFrom(sec){
     clearInterval(progressInterval);
     const duration = partes[current].duracion_seg ?? partes[current].Duration ?? 0;
@@ -505,8 +577,6 @@ function restartProgressFrom(sec){
         }
     }, 1000);
 }
-
-/* Toggle play/pause (Se mantiene igual) */
 function togglePlay(){
     const btn = $('play-btn'); 
     paused = !paused;
@@ -529,8 +599,6 @@ function togglePlay(){
         restartPartFromProgress();
     }
 }
-
-/* Reinicia la parte actual desde la posición guardada (Se mantiene igual) */
 function restartPartFromProgress(){
     if(!partes || current < 0 || current >= partes.length) return;
     showUI();
@@ -555,7 +623,7 @@ function restartPartFromProgress(){
     }, 800);
 }
 
-/* next/prev part (Se mantiene igual) */
+/* next/prev part (Se mantienen iguales) */
 function nextPart(){
     if(current < (partes.length - 1)) {
         const nextPartIndex = current + 1;
@@ -598,7 +666,7 @@ function prevPart(){
     }
 }
 
-/* Parts list (Se mantiene igual) */
+/* Parts list (Se mantienen iguales) */
 function buildPartsList(){
     const menu = $('parts-menu');
     menu.innerHTML = '';
@@ -633,7 +701,7 @@ function setPlayer(start, duration, pos){
     playerFrame.src = `https://www.youtube.com/embed/${videoId}?start=${pos}&end=${end}&autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1&mute=${allowSound?0:1}&v=${unique}`;
 }
 
-/* CONFIG DE ADS (Se mantiene igual) */
+/* CONFIG DE ADS (Se mantienen iguales) */
 const MAX_ADS = 10;
 function resetAds() {
     const container = $('ad-container');
@@ -674,7 +742,7 @@ function createAds(count) {
 }
 
 
-/* THUMBNAILS / SEARCH GRID */
+/* THUMBNAILS / SEARCH GRID (Se mantiene igual) */
 function buildThumbnails(containerId = 'thumbnails-container', data = videoData, clickFn = (idx)=> { 
     // Comportamiento predeterminado para Explorar (thumbnails-container)
     scrollToVideo(idx);
@@ -736,7 +804,7 @@ function buildThumbnails(containerId = 'thumbnails-container', data = videoData,
     }
 }
 
-/* SEARCH logic (Corregida la llamada a updateLoadMoreButtonClones y cierre del panel) */
+/* SEARCH logic (Se mantiene igual) */
 const searchInput = $('search-input');
 if(searchInput){
     searchInput.addEventListener('input', ()=> {
@@ -744,7 +812,7 @@ if(searchInput){
         buildSearchResults(q);
     });
 }
-// --- FUNCIÓN REESCRITA PARA BUSCAR VÍDEOS EN LA API ---
+// --- FUNCIÓN REESCRITA PARA BUSCAR VÍDEOS EN LA API (Se mantiene igual) ---
 async function buildSearchResults(query){
     const container = $('search-results');
     const searchPanel = $('search-panel');
@@ -830,7 +898,7 @@ async function buildSearchResults(query){
     }
 }
 
-/* UI show/hide logic (Se mantiene igual) */
+/* UI show/hide logic (Se mantienen iguales) */
 function showUI(){
     const appbar = $('appbar'), bottom = $('bottom-ui'), explore = $('explore-panel'), search = $('search-panel'), parts = $('parts-menu');
     appbar.style.top = `calc(var(--safe-top) + 8px)`;
@@ -848,7 +916,7 @@ function showUI(){
     }, 4200);
 }
 
-/* Toggle panels (Se mantiene igual) */
+/* Toggle panels (Se mantienen iguales) */
 function toggleMenu(){ $('parts-menu').classList.toggle('open'); showUI(); }
 function toggleExplore(){ 
     $('explore-panel').classList.toggle('open'); 
@@ -867,16 +935,13 @@ function toggleSearch(){
     showUI(); 
 }
 
-/* Prev/Next global buttons (Se mantiene igual) */
+/* Prev/Next global buttons (Se mantienen iguales) */
 $('prev-video-btn').addEventListener('click', prevPart);
 $('next-video-btn').addEventListener('click', nextPart);
-
-/* Añadido: Botón para video aleatorio (Se mantiene el listener si existe el botón) */
 const randomBtn = $('random-btn');
 if(randomBtn) {
     randomBtn.addEventListener('click', loadRandomVideo);
 }
-
 
 /* Scroll to a specific video index with smooth snap (Se mantiene igual) */
 function scrollToVideo(index){
@@ -908,10 +973,18 @@ function scrollToPart(videoIndex, partIndex, forceLoad = false){
     }
 }
 
-/* Interaction to show UI (Se mantiene igual) */
+/* Interaction to show UI (Se mantienen iguales) */
 document.addEventListener('mousemove', showUI, {passive:true});
 document.addEventListener('touchstart', showUI, {passive:true});
 document.addEventListener('keydown', showUI);
+
+// 🔥 NUEVO: Listener para el cambio de hash (maneja los botones Atrás/Adelante del navegador)
+window.addEventListener('hashchange', () => {
+    // Si la aplicación no está ya actualizando la ruta, la manejamos.
+    if (!isHandlingRoute) {
+        handleRoute();
+    }
+});
 
 /* Initialize */
 loadJSON();
