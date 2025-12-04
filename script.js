@@ -28,19 +28,22 @@ const THUMBNAIL_BASE_URL = "https://raw.githubusercontent.com/johnclivergastonpa
 
 /* ===== CARGAR JSON (API Paginada) ===== */
 async function loadJSON(){
-    // Cargar la primera página (página 0)
+    // 1. Cargar la primera página (página 0)
     await loadPage(0);
 
-    // Inicializar el botón "Ver Más" y sus clones
+    // 2. Inicializar el botón "Ver Más" y sus clones
     setupLoadMoreButton(); 
 
-    // Inicializar UI de exploración/búsqueda con los datos disponibles
+    // 3. Inicializar UI de exploración/búsqueda con los datos disponibles
     buildThumbnails(); 
     buildThumbnails('search-results', []); 
 
-    // Cargar el primer video
-    if(videoData.length) loadVideo(0);
-    else $('title-bar').innerText = "No hay videos o la API no responde";
+    // 4. 🔥 CAMBIO CLAVE: Cargar un video ALEATORIO en lugar del primero (videoIndex 0)
+    if(videoData.length) {
+        await loadRandomVideo();
+    } else {
+        $('title-bar').innerText = "No hay videos o la API no responde";
+    }
 }
 
 // --- FUNCIÓN PARA CARGAR PÁGINAS ESPECÍFICAS ---
@@ -88,19 +91,13 @@ async function loadPage(pageNumber) {
             buildScrollPages(startIdx); // Pasar el índice de inicio
         }
 
-        // 4. Si es la primera carga (página 0), asegurar que el primer video se cargue
-        if (pageNumber === 0 && videoData.length > 0) {
-              loadVideo(0);
-        }
+        // 4. 🔥 MODIFICACIÓN: Ya no cargamos el primer video aquí (loadVideo(0)),
+        // eso lo hará loadRandomVideo() en loadJSON().
 
         // 5. Actualizar el explorador de miniaturas si está abierto y sincronizar clones
-        // **CORRECCIÓN CLAVE:** Forzar la reconstrucción de miniaturas de Explorar
-        // y, crucialmente, de **Búsqueda** para que aparezca el botón "Ver más"
-        // y para que la búsqueda contenga los nuevos videos.
         if ($('explore-panel')?.classList.contains('open')) {
             buildThumbnails('thumbnails-container', videoData);
         }
-        // Si el panel de búsqueda está abierto, reconstruir los resultados para incluir el botón
         if ($('search-panel')?.classList.contains('open')) {
              buildSearchResults($('search-input').value || '');
         }
@@ -211,6 +208,68 @@ function updateLoadMoreButtonClones(originalButton) {
     }
 }
 
+// ====================================================================
+// ===== FUNCIONALIDAD DE VIDEO ALEATORIO =============================
+// ====================================================================
+
+/**
+ * Carga un video aleatorio llamando al endpoint /random de la API.
+ */
+async function loadRandomVideo() {
+    $('title-bar').innerText = "Cargando video aleatorio...";
+    try {
+        const url = `${BASE_URL}/random`;
+        console.log(`Cargando video aleatorio desde: ${url}`);
+        
+        const res = await fetch(url);
+        if (!res.ok) {
+            throw new Error(`Error HTTP: ${res.status}`);
+        }
+        
+        // Obtener el video aleatorio
+        const randomVideo = await res.json();
+        
+        if (!randomVideo || !randomVideo.id) {
+            $('title-bar').innerText = "Error: La API no devolvió un video válido.";
+            return;
+        }
+
+        // 1. Verificar si el video ya está cargado en videoData
+        let existingIndex = videoData.findIndex(v => v.id === randomVideo.id);
+
+        if (existingIndex === -1) {
+            // 2. Si es un video completamente nuevo:
+            // Insertarlo en videoData (al inicio, para que aparezca primero en el scroll)
+            videoData.unshift(randomVideo);
+            existingIndex = 0; // El nuevo índice es 0
+            
+            // Reconstruir TODAS las páginas de scroll desde el inicio para incluir el nuevo video
+            // Esto es más simple y seguro que manejar la inserción dinámica.
+            const scrollContainer = $('tiktok-scroll-container');
+            if (scrollContainer) scrollContainer.innerHTML = '';
+            buildScrollPages(0);
+
+            // Nota: No actualizamos currentPage/hasMore, ya que este es un video especial.
+        }
+        
+        // 3. Desplazarse al video y cargarlo
+        scrollToVideo(existingIndex);
+        
+        // 4. Si los paneles están abiertos, reconstruir las miniaturas para incluir el nuevo
+        if ($('explore-panel')?.classList.contains('open')) {
+            buildThumbnails('thumbnails-container', videoData);
+        }
+        if ($('search-panel')?.classList.contains('open')) {
+             buildSearchResults($('search-input').value || '');
+        }
+
+    } catch (err) {
+        console.error("❌ Error cargando video aleatorio.", err);
+        $('title-bar').innerText = "Error al cargar video aleatorio.";
+    }
+}
+
+// --------------------------------------------------------------------
 
 /* ===== Construir páginas tipo TikTok dinámicamente ===== */
 function buildScrollPages(startIdx = 0){
@@ -262,7 +321,7 @@ function buildScrollPages(startIdx = 0){
             const thumb = document.createElement('div');
             thumb.className = 'page-thumb';
             
-            // 🔥 CORRECCIÓN: Lógica para la URL de la miniatura de fondo.
+            // Lógica para la URL de la miniatura de fondo.
             let thumbUrl = 'https://via.placeholder.com/720x1280?text=Sin+imagen';
             if (video.thumbnail) {
                 if (video.thumbnail.startsWith('http') || video.thumbnail.startsWith('//')) {
@@ -298,10 +357,10 @@ function buildScrollPages(startIdx = 0){
         page.appendChild(partsContainer);
         
         // 5. Insertar la nueva página ANTES del botón (si existe).
-        if (loadMoreButton) {
+        if (loadMoreButton && loadMoreButton.parentNode === scrollContainer) {
             scrollContainer.insertBefore(page, loadMoreButton);
         } else {
-            // Si el botón aún no se ha creado (ej. en la carga inicial), añadir al final.
+            // Si el botón aún no se ha creado o no está en scrollContainer, añadir al final.
             scrollContainer.appendChild(page);
         }
     }
@@ -507,7 +566,8 @@ function nextPart(){
         
         // Comprobar si hay que cargar más antes de saltar
         if(nextIndex >= videoData.length && hasMore) {
-            alert('Llegaste al final de los videos cargados. Presiona "Ver más videos" para cargar la siguiente página.');
+            // Ir al siguiente video aleatorio (funciona como scroll infinito)
+            loadRandomVideo();
         } else if (nextIndex < videoData.length) {
             scrollToVideo(nextIndex);
         }
@@ -619,9 +679,9 @@ function buildThumbnails(containerId = 'thumbnails-container', data = videoData,
     // Comportamiento predeterminado para Explorar (thumbnails-container)
     scrollToVideo(idx);
     
-    // **CORRECCIÓN 1: CERRAR EXPLORAR AL HACER CLIC**
+    // Cierra el panel de explorar
     if (containerId === 'thumbnails-container') {
-        toggleExplore(); // Cierra el panel de explorar
+        toggleExplore(); 
     }
 } ){ 
     const container = $(containerId);
@@ -666,7 +726,7 @@ function buildThumbnails(containerId = 'thumbnails-container', data = videoData,
         container.appendChild(wrapper);
     });
     
-    // **CORRECCIÓN ADICIONAL:** Reconstruir el botón de búsqueda para que aparezca después de las miniaturas
+    // Reconstruir el botón de búsqueda para que aparezca después de las miniaturas
     if (containerId === 'search-results') {
          const originalButton = $('load-more-btn');
          if (originalButton) {
@@ -684,19 +744,90 @@ if(searchInput){
         buildSearchResults(q);
     });
 }
-function buildSearchResults(query){
-    const results = (videoData || []).filter(v => (v.titulo||v.Title||'').toLowerCase().includes(query));
+// --- FUNCIÓN REESCRITA PARA BUSCAR VÍDEOS EN LA API ---
+async function buildSearchResults(query){
+    const container = $('search-results');
+    const searchPanel = $('search-panel');
+    if(!container || !searchPanel) return;
+
+    // 1. Ocultar el botón de "Ver más" temporalmente (o mantener la lógica de paginación)
+    const searchLoadMoreContainer = $('search-load-more');
+    if (searchLoadMoreContainer) searchLoadMoreContainer.innerHTML = '';
     
-    buildThumbnails('search-results', results, (localIndex) => {
-        const item = results[localIndex];
-        if(!item) return;
-        const global = videoData.findIndex(v => v.id === item.id);
-        if(global >= 0) {
-            // **CORRECCIÓN 2:** Cerrar el panel de Búsqueda al hacer clic en un video
-            toggleSearch(); 
-            scrollToVideo(global);
+    // Comprobar si la consulta está vacía.
+    if (!query || query.trim() === '') {
+        // SI LA CONSULTA ESTÁ VACÍA: Mostrar todos los videos cargados
+        container.innerHTML = ''; 
+        
+        if (videoData.length === 0) {
+            container.innerHTML = '<h2>Cargando videos...</h2>';
+            return;
         }
-    });
+
+        // Usamos videoData (la lista completa en memoria)
+        buildThumbnails('search-results', videoData, (localIndex) => {
+            const item = videoData[localIndex];
+            if(!item) return;
+
+            // El índice local es el índice global en este caso
+            scrollToVideo(localIndex);
+            toggleSearch(); // Cerrar el panel de Búsqueda
+        });
+        
+        // Sincronizar el botón "Ver más"
+        const originalButton = $('load-more-btn');
+        if (originalButton) {
+             updateLoadMoreButtonClones(originalButton);
+        }
+        return; // Salir de la función aquí
+    }
+    
+    // SI LA CONSULTA NO ESTÁ VACÍA (LÓGICA DE BÚSQUEDA REAL):
+    
+    // 2. Mostrar un estado de carga para la búsqueda activa
+    container.innerHTML = '<h2>Cargando resultados de búsqueda...</h2>';
+    
+    try {
+        // 3. Llamada al endpoint /search de la API Go
+        const url = `${BASE_URL}/search?q=${encodeURIComponent(query)}`;
+        console.log(`Buscando en API: ${url}`);
+        
+        const res = await fetch(url);
+        if (!res.ok) {
+            throw new Error(`Error HTTP: ${res.status}`);
+        }
+        
+        // 4. Obtener los resultados del servidor
+        const results = await res.json();
+        
+        // 5. Limpiar y construir las miniaturas con los resultados del servidor
+        container.innerHTML = ''; // Limpiar el mensaje de carga
+        
+        if (results.length === 0) {
+            container.innerHTML = `<h2>No se encontraron resultados para "${query}".</h2>`;
+            return;
+        }
+
+        // Usamos buildThumbnails con la nueva lista y una función de clic que encuentra el índice global
+        buildThumbnails('search-results', results, (localIndex) => {
+            const item = results[localIndex];
+            if(!item) return;
+
+            // Encontrar el índice del video en la lista global `videoData` 
+            const global = videoData.findIndex(v => v.id === item.id);
+            
+            if(global >= 0) {
+                scrollToVideo(global);
+                toggleSearch(); // Cerrar el panel de Búsqueda
+            } else {
+                alert("Error: El video encontrado no está en la lista principal cargada.");
+            }
+        });
+
+    } catch (err) {
+        console.error("❌ Error en la búsqueda de la API.", err);
+        container.innerHTML = '<h2>Error al conectar con la API de búsqueda.</h2>';
+    }
 }
 
 /* UI show/hide logic (Se mantiene igual) */
@@ -739,6 +870,13 @@ function toggleSearch(){
 /* Prev/Next global buttons (Se mantiene igual) */
 $('prev-video-btn').addEventListener('click', prevPart);
 $('next-video-btn').addEventListener('click', nextPart);
+
+/* Añadido: Botón para video aleatorio (Se mantiene el listener si existe el botón) */
+const randomBtn = $('random-btn');
+if(randomBtn) {
+    randomBtn.addEventListener('click', loadRandomVideo);
+}
+
 
 /* Scroll to a specific video index with smooth snap (Se mantiene igual) */
 function scrollToVideo(index){
