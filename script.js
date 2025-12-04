@@ -79,7 +79,7 @@ async function loadPage(pageNumber) {
         }
         
         if (loadMoreButton) {
-            loadMoreButton.innerText = hasMore ? `Ver más videos (${LIMIT})` : 'No hay más videos.';
+            loadMoreButton.innerText = hasMore ? `Ver más videos` : 'No hay más videos.';
             loadMoreButton.disabled = !hasMore;
         }
         
@@ -132,7 +132,7 @@ function setupLoadMoreButton() {
     loadMoreButton = document.createElement('button');
     loadMoreButton.id = 'load-more-btn';
     loadMoreButton.className = 'load-more-button'; 
-    loadMoreButton.innerText = hasMore ? `Ver más videos (${LIMIT})` : 'No hay más videos.';
+    loadMoreButton.innerText = hasMore ? `Ver más videos` : 'No hay más videos.';
     loadMoreButton.disabled = !hasMore;
     
     const loadNextPage = async (btn) => {
@@ -151,6 +151,16 @@ function setupLoadMoreButton() {
 }
 
 // --- FUNCIÓN HELPER PARA CLONAR Y SINCRONIZAR EL BOTÓN (Se mantiene igual) ---
+/* Asegúrate de que esta función loadPanelAd() esté definida en script.js,
+   como te la proporcioné en la respuesta anterior:
+
+function loadPanelAd(containerId) {
+    const container = document.getElementById(containerId);
+    if (container) { container.innerHTML = ''; } else { return; }
+    // ... (resto del código de inyección del script de anuncio) ...
+}
+*/
+
 function updateLoadMoreButtonClones(originalButton) {
     const explorerContainer = $('explore-load-more');
     const searchContainer = $('search-load-more');
@@ -158,17 +168,31 @@ function updateLoadMoreButtonClones(originalButton) {
     const btnText = originalButton.innerText;
     const btnDisabled = originalButton.disabled;
 
+    // 🔴 Lógica de manejo de clic modificada
     const handleClick = async (clone) => {
-         clone.innerText = 'Cargando...';
-         clone.disabled = true;
-         await loadPage(currentPage + 1);
-         updateLoadMoreButtonClones(originalButton); 
+        clone.innerText = 'Cargando...';
+        clone.disabled = true;
+        
+        await loadPage(currentPage + 1); // Espera que cargue el nuevo contenido
+        
+        // 1. Identificar si el clic vino del botón de Explorar o de Buscar
+        const isExploreButton = clone.id === 'explore-load-more-btn';
+        
+        // 2. 🔴 Llamar a loadPanelAd para recargar el anuncio correspondiente
+        if (isExploreButton) {
+            loadPanelAd('explore-ad-container');
+        } else {
+            loadPanelAd('search-ad-container');
+        }
+
+        updateLoadMoreButtonClones(originalButton); 
     };
+    // ----------------------------------------------------
 
     if (explorerContainer) {
         explorerContainer.innerHTML = '';
         const clone = originalButton.cloneNode(true);
-        clone.id = 'explore-load-more-btn'; 
+        clone.id = 'explore-load-more-btn'; // Se mantiene este ID para identificarlo
         clone.innerText = btnText;
         clone.disabled = btnDisabled;
         
@@ -179,7 +203,7 @@ function updateLoadMoreButtonClones(originalButton) {
     if (searchContainer) {
         searchContainer.innerHTML = '';
         const clone = originalButton.cloneNode(true);
-        clone.id = 'search-load-more-btn';
+        clone.id = 'search-load-more-btn'; // Se mantiene este ID para identificarlo
         clone.innerText = btnText;
         clone.disabled = btnDisabled;
 
@@ -898,24 +922,29 @@ function buildThumbnails(containerId = 'thumbnails-container', data = videoData,
     }
     
     /* Toggle panels (Se mantiene igual) */
-    function toggleMenu(){ $('parts-menu').classList.toggle('open'); showUI(); }
-    function toggleExplore(){ 
-        $('explore-panel').classList.toggle('open'); 
-        if ($('explore-panel').classList.contains('open')) {
-            buildThumbnails('thumbnails-container', videoData);
-        }
-        showUI(); 
+function toggleMenu(){ $('parts-menu').classList.toggle('open'); showUI(); }
+
+function toggleExplore(){ 
+    const p = $('explore-panel'); 
+    p.classList.toggle('open'); 
+    if (p.classList.contains('open')) {
+        buildThumbnails('thumbnails-container', videoData);
+        loadPanelAd('explore-ad-container'); // 🔴 LLAMADA PARA EL ANUNCIO AL ABRIR
     }
-    function toggleSearch(){ 
-        const p = $('search-panel'); 
-        p.classList.toggle('open'); 
-        if(p.classList.contains('open')) { 
-            $('search-input').focus(); 
-            buildSearchResults($('search-input').value || ''); 
-        } 
-        showUI(); 
-    }
-    
+    showUI(); 
+}
+
+function toggleSearch(){ 
+    const p = $('search-panel'); 
+    p.classList.toggle('open'); 
+    if(p.classList.contains('open')) { 
+        $('search-input').focus(); 
+        buildSearchResults($('search-input').value || ''); 
+        loadPanelAd('search-ad-container'); // 🔴 LLAMADA PARA EL ANUNCIO AL ABRIR
+    } 
+    showUI(); 
+}
+
     /* Prev/Next global buttons (Se mantiene igual) */
     $('prev-video-btn').addEventListener('click', prevPart);
     $('next-video-btn').addEventListener('click', nextPart);
@@ -965,6 +994,40 @@ function buildThumbnails(containerId = 'thumbnails-container', data = videoData,
             handleRoute();
         }
     });
+
+    /* Nueva Función para cargar el anuncio en los paneles laterales */
+/* Función para cargar y recargar el anuncio en los paneles laterales */
+function loadPanelAd(containerId) {
+    const container = document.getElementById(containerId);
     
+    // Si el contenedor no existe o no es un elemento, salimos.
+    if (!container) return;
+    
+    // 1. Limpiamos completamente el contenedor para la nueva carga.
+    container.innerHTML = ''; 
+    
+    // 2. Definición del objeto 'atOptions' (Configuración del anuncio)
+    const adScriptConfig = document.createElement("script");
+    adScriptConfig.type = "text/javascript";
+    adScriptConfig.innerHTML = `
+        atOptions = {
+            'key' : '3e93e9513909a27236edf2b37efbaa01',
+            'format' : 'iframe',
+            'height' : 250,
+            'width' : 300,
+            'params' : {}
+        };
+    `;
+    
+    // 3. Definición del script de invocación del proveedor
+    const adScriptInvoke = document.createElement("script");
+    adScriptInvoke.type = "text/javascript";
+    adScriptInvoke.src = "//www.highperformanceformat.com/3e93e9513909a27236edf2b37efbaa01/invoke.js";
+    
+    // 4. Inyectamos ambos scripts en el contenedor del anuncio
+    container.appendChild(adScriptConfig);
+    container.appendChild(adScriptInvoke);
+}
+
     /* Initialize */
     loadJSON();

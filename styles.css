@@ -315,6 +315,43 @@
     /* Ads small */
     #ad-container{display:flex;flex-direction:row;gap:10px;overflow:auto;padding:6px 0}
     .ad-box{min-width:180px;height:56px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;padding:6px;color:var(--text-dim)}
+        /* Agrega este nuevo estilo para centrar el anuncio en los paneles */
+/* Mantengo el estilo que agregamos para centrar el anuncio en los paneles */
+        .ad-container-panel {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px auto; 
+            min-height: 250px; /* Para que reserve espacio */
+            max-width: 300px;
+        }
+
+        /* --- Regla para solucionar el Scroll en Móviles --- */
+.panel {
+    -webkit-overflow-scrolling: touch; /* Clave para iOS */
+    overflow-y: auto;                  /* Asegura el scroll vertical */
+    height: 100%;                      /* Asegura que el panel use toda la altura disponible */
+    box-sizing: border-box;            /* Asegura que padding no cause desbordamiento */
+}
+
+/* styles.css (Asegúrate que estas propiedades estén en los selectores de los paneles) */
+
+#explore-panel, 
+#search-panel, 
+#parts-menu {
+    /* (Otras propiedades de posicionamiento, color, etc.) */
+    
+    height: 100%; 
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* 🔑 SOLUCIÓN PARA DISPOSITIVOS MÓVILES */
+}
+
+/* Y si tienes un panel de video (ej. #video-panel): */
+#video-panel {
+    /* ... */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
 
     /* Small screens adjustments */
     @media (max-width:420px){
@@ -364,6 +401,7 @@
         height: 100vh;
         overflow-y: auto; /* Permite el scroll vertical dentro de esta sección */
         scroll-snap-type: y mandatory; /* Habilita el snap para las partes */
+        -webkit-overflow-scrolling: touch; /* 🔑 SOLUCIÓN CLAVE PARA MÓVILES */
     }
     .video-page-parts-container::-webkit-scrollbar { width: 0; height: 0; }
 
